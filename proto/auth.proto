@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package auth;
+
+option go_package = "github.com/longvhv/saas-framework-go/services/auth-service/proto";
+
+// AuthService provides authentication and authorization functionality
+service AuthService {
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  rpc GetUserRoles(GetUserRolesRequest) returns (GetUserRolesResponse);
+  rpc CheckPermission(CheckPermissionRequest) returns (CheckPermissionResponse);
+}
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string tenant_id = 3;
+  string email = 4;
+  repeated string roles = 5;
+  string error_message = 6;
+}
+
+message GetUserRolesRequest {
+  string user_id = 1;
+  string tenant_id = 2;
+}
+
+message GetUserRolesResponse {
+  repeated string roles = 1;
+  repeated string permissions = 2;
+}
+
+message CheckPermissionRequest {
+  string user_id = 1;
+  string tenant_id = 2;
+  string permission = 3;
+}
+
+message CheckPermissionResponse {
+  bool allowed = 1;
+}
