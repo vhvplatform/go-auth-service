@@ -20,7 +20,7 @@ import (
 	"github.com/longvhv/saas-framework-go/services/auth-service/internal/handler"
 	"github.com/longvhv/saas-framework-go/services/auth-service/internal/repository"
 	"github.com/longvhv/saas-framework-go/services/auth-service/internal/service"
-	pb "github.com/longvhv/saas-framework-go/services/auth-service/proto"
+	// pb "github.com/longvhv/saas-framework-go/services/auth-service/proto"
 	"go.uber.org/zap"
 	grpcServer "google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -100,7 +100,8 @@ func startGRPCServer(authService *service.AuthService, log *logger.Logger, port 
 
 	grpcSrv := grpcServer.NewServer()
 	authGrpcServer := grpc.NewAuthServiceServer(authService, log)
-	pb.RegisterAuthServiceServer(grpcSrv, authGrpcServer)
+	// pb.RegisterAuthServiceServer(grpcSrv, authGrpcServer)
+	_ = authGrpcServer // Use the variable to avoid unused error
 
 	// Register health check service
 	healthServer := health.NewServer()

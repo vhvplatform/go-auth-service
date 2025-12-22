@@ -1,17 +1,14 @@
 package grpc
 
 import (
-	"context"
-
 	"github.com/longvhv/saas-framework-go/pkg/logger"
 	"github.com/longvhv/saas-framework-go/services/auth-service/internal/service"
-	pb "github.com/longvhv/saas-framework-go/services/auth-service/proto"
-	"go.uber.org/zap"
+	// pb "github.com/longvhv/saas-framework-go/services/auth-service/proto"
 )
 
 // AuthServiceServer implements the gRPC auth service
 type AuthServiceServer struct {
-	pb.UnimplementedAuthServiceServer
+	// pb.UnimplementedAuthServiceServer
 	authService *service.AuthService
 	logger      *logger.Logger
 }
@@ -24,6 +21,10 @@ func NewAuthServiceServer(authService *service.AuthService, log *logger.Logger) 
 	}
 }
 
+// Note: gRPC methods are commented out until protobuf code is generated
+// Run `make proto` to generate the protobuf code, then uncomment the methods below
+
+/*
 // ValidateToken validates a JWT token
 func (s *AuthServiceServer) ValidateToken(ctx context.Context, req *pb.ValidateTokenRequest) (*pb.ValidateTokenResponse, error) {
 	claims, err := s.authService.ValidateToken(ctx, req.Token)
@@ -70,3 +71,4 @@ func (s *AuthServiceServer) CheckPermission(ctx context.Context, req *pb.CheckPe
 		Allowed: allowed,
 	}, nil
 }
+*/
