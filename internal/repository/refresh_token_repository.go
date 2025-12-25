@@ -20,11 +20,11 @@ type RefreshTokenRepository struct {
 // NewRefreshTokenRepository creates a new refresh token repository
 func NewRefreshTokenRepository(db *mongo.Database) *RefreshTokenRepository {
 	collection := db.Collection("refresh_tokens")
-	
+
 	// Create indexes
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	indexes := []mongo.IndexModel{
 		{
 			Keys: bson.D{{Key: "user_id", Value: 1}},
@@ -38,21 +38,21 @@ func NewRefreshTokenRepository(db *mongo.Database) *RefreshTokenRepository {
 			Options: options.Index().SetExpireAfterSeconds(0),
 		},
 	}
-	
+
 	_, _ = collection.Indexes().CreateMany(ctx, indexes)
-	
+
 	return &RefreshTokenRepository{collection: collection}
 }
 
 // Create creates a new refresh token
 func (r *RefreshTokenRepository) Create(ctx context.Context, token *domain.RefreshToken) error {
 	token.CreatedAt = time.Now()
-	
+
 	result, err := r.collection.InsertOne(ctx, token)
 	if err != nil {
 		return fmt.Errorf("failed to create refresh token: %w", err)
 	}
-	
+
 	token.ID = result.InsertedID.(primitive.ObjectID)
 	return nil
 }

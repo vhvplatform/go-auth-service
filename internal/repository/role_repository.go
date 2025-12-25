@@ -19,11 +19,11 @@ type RoleRepository struct {
 // NewRoleRepository creates a new role repository
 func NewRoleRepository(db *mongo.Database) *RoleRepository {
 	collection := db.Collection("roles")
-	
+
 	// Create indexes
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	indexes := []mongo.IndexModel{
 		{
 			Keys: bson.D{
@@ -33,9 +33,9 @@ func NewRoleRepository(db *mongo.Database) *RoleRepository {
 			Options: options.Index().SetUnique(true),
 		},
 	}
-	
+
 	_, _ = collection.Indexes().CreateMany(ctx, indexes)
-	
+
 	return &RoleRepository{collection: collection}
 }
 
@@ -48,18 +48,18 @@ func (r *RoleRepository) FindByNames(ctx context.Context, names []string, tenant
 			{"tenant_id": bson.M{"$exists": false}},
 		},
 	}
-	
+
 	cursor, err := r.collection.Find(ctx, filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find roles: %w", err)
 	}
 	defer cursor.Close(ctx)
-	
+
 	var roles []*domain.Role
 	if err := cursor.All(ctx, &roles); err != nil {
 		return nil, fmt.Errorf("failed to decode roles: %w", err)
 	}
-	
+
 	return roles, nil
 }
 
@@ -69,18 +69,18 @@ func (r *RoleRepository) GetPermissionsForRoles(ctx context.Context, roles []str
 	if err != nil {
 		return nil, err
 	}
-	
+
 	permissionsMap := make(map[string]bool)
 	for _, role := range foundRoles {
 		for _, permission := range role.Permissions {
 			permissionsMap[permission] = true
 		}
 	}
-	
+
 	permissions := make([]string, 0, len(permissionsMap))
 	for permission := range permissionsMap {
 		permissions = append(permissions, permission)
 	}
-	
+
 	return permissions, nil
 }
