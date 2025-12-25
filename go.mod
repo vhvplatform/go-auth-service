@@ -5,9 +5,9 @@
 
 module github.com/vhvcorp/go-auth-service
 
-go 1.24.0
+go 1.25
 
-toolchain go1.24.11
+toolchain go1.25.5
 
 require (
 	github.com/gin-gonic/gin v1.11.0
@@ -53,7 +53,6 @@ require (
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/spf13/viper v1.20.0 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.0 // indirect
