@@ -1,0 +1,69 @@
+@startuml Authentication Flow
+
+title Authentication Flow - Login, Logout, Token Refresh
+
+actor User
+participant "Web Client" as Client
+participant "API Gateway" as Gateway
+participant "Auth Service" as Auth
+database "MongoDB" as DB
+database "Redis Cache" as Redis
+
+== Login Flow ==
+User -> Client: Enter credentials
+Client -> Gateway: POST /api/v1/auth/login\n{email, password, tenant_id}
+Gateway -> Auth: Forward login request
+Auth -> DB: Find user by email and tenant
+DB --> Auth: User data
+Auth -> Auth: Verify password hash
+Auth -> Auth: Check user status (active, verified)
+Auth -> Auth: Generate JWT tokens\n(access + refresh)
+Auth -> DB: Store refresh token
+Auth -> Redis: Create session\nKey: session:{user_id}\nTTL: 1 hour
+Auth -> DB: Update last_login_at
+Auth --> Gateway: {access_token, refresh_token, user_info}
+Gateway --> Client: Authentication successful
+Client -> Client: Store tokens securely
+Client --> User: Login successful
+
+== Token Validation ==
+User -> Client: Access protected resource
+Client -> Gateway: GET /api/resource\nHeader: Authorization: Bearer {token}
+Gateway -> Auth: Validate token (gRPC)
+Auth -> Auth: Verify JWT signature
+Auth -> Auth: Check expiration
+Auth -> Redis: Check session exists
+Redis --> Auth: Session data
+Auth --> Gateway: Token valid + user context
+Gateway -> Gateway: Add user context to request
+Gateway --> Client: Protected resource data
+
+== Token Refresh Flow ==
+Client -> Client: Access token expired
+Client -> Gateway: POST /api/v1/auth/refresh\n{refresh_token}
+Gateway -> Auth: Refresh token request
+Auth -> DB: Validate refresh token
+DB --> Auth: Refresh token data
+Auth -> Auth: Check token not revoked
+Auth -> Auth: Check expiration
+Auth -> DB: Find user by ID
+Auth -> Auth: Generate new tokens
+Auth -> DB: Revoke old refresh token
+Auth -> DB: Store new refresh token
+Auth -> Redis: Update session
+Auth --> Gateway: {new_access_token, new_refresh_token}
+Gateway --> Client: New tokens
+Client -> Client: Update stored tokens
+
+== Logout Flow ==
+User -> Client: Click logout
+Client -> Gateway: POST /api/v1/auth/logout\n{refresh_token}\nHeader: Authorization
+Gateway -> Auth: Logout request
+Auth -> DB: Revoke refresh token\nSet revoked_at timestamp
+Auth -> Redis: Delete session\nKey: session:{user_id}
+Auth --> Gateway: Logout successful
+Gateway --> Client: 200 OK
+Client -> Client: Clear stored tokens
+Client --> User: Logged out
+
+@enduml

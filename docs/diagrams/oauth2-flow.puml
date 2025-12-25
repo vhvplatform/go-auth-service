@@ -1,0 +1,74 @@
+@startuml OAuth2 Authorization Code Flow
+
+title OAuth2 Integration - Authorization Code Flow
+
+actor User
+participant "Web Client" as Client
+participant "Auth Service" as Auth
+participant "OAuth Provider\n(Google/GitHub)" as OAuth
+database "MongoDB" as DB
+database "Redis Cache" as Redis
+
+== OAuth2 Authorization Flow ==
+User -> Client: Click "Login with Google/GitHub"
+Client -> Client: Generate state token\n(CSRF protection)
+Client -> Client: Store state in session
+Client --> User: Redirect to OAuth provider
+
+User -> OAuth: Authorize application
+OAuth -> OAuth: User authenticates
+OAuth -> OAuth: User grants permissions
+OAuth --> User: Redirect with authorization code\n?code=xyz&state=abc
+
+User -> Client: Follow redirect
+Client -> Client: Verify state token
+Client -> Auth: POST /api/v1/auth/oauth/callback\n{code, state, provider}
+
+== Token Exchange ==
+Auth -> Auth: Verify state token
+Auth -> OAuth: POST /token\n{code, client_id, client_secret, redirect_uri}
+OAuth -> OAuth: Validate authorization code
+OAuth --> Auth: {access_token, refresh_token, expires_in}
+
+== User Profile Retrieval ==
+Auth -> OAuth: GET /userinfo\nHeader: Authorization: Bearer {access_token}
+OAuth --> Auth: User profile data\n{id, email, name, avatar}
+
+== User Account Handling ==
+Auth -> DB: Find user by email
+alt User exists
+    Auth -> DB: Check if OAuth account linked
+    alt OAuth account exists
+        Auth -> DB: Update OAuth tokens
+    else OAuth account not linked
+        Auth -> DB: Create OAuth account link\n{user_id, provider, provider_id}
+    end
+else User does not exist
+    Auth -> Auth: Generate secure password
+    Auth -> Auth: Hash password
+    Auth -> DB: Create new user account\n{email, password_hash, is_verified=true}
+    DB --> Auth: New user created
+    Auth -> DB: Create OAuth account link
+end
+
+== Session Creation ==
+Auth -> Auth: Generate JWT tokens
+Auth -> DB: Store refresh token
+Auth -> Redis: Create session\nKey: session:{user_id}
+Auth --> Client: {access_token, refresh_token, user_info}
+Client -> Client: Store tokens securely
+Client --> User: OAuth login successful
+
+== OAuth Token Refresh (Background) ==
+note over Auth, OAuth
+  When OAuth access token expires,
+  Auth Service can use refresh token
+  to get new access token without
+  user interaction
+end note
+
+Auth -> OAuth: POST /token\n{refresh_token, grant_type=refresh_token}
+OAuth --> Auth: New OAuth access token
+Auth -> DB: Update OAuth account tokens
+
+@enduml

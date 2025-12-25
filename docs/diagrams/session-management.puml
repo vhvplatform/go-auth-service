@@ -1,0 +1,192 @@
+@startuml Session Management
+
+title Session Management - Creation, Validation, and Cleanup
+
+participant "Client" as Client
+participant "Auth Service" as Auth
+participant "Middleware" as MW
+database "Redis Cache" as Redis
+database "MongoDB" as DB
+
+== Session Creation (On Login) ==
+Client -> Auth: POST /auth/login\n{email, password}
+Auth -> DB: Authenticate user
+DB --> Auth: User data {id, email, tenant_id, roles}
+
+Auth -> Auth: Generate JWT tokens
+Auth -> Redis: Create session
+note right of Redis
+  Key: session:{user_id}
+  Value: {
+    user_id: "507f...",
+    tenant_id: "tenant_123",
+    email: "user@example.com",
+    roles: ["user", "admin"],
+    created_at: "2023-12-25T10:00:00Z",
+    expires_at: "2023-12-25T11:00:00Z",
+    ip_address: "192.168.1.100",
+    user_agent: "Mozilla/5.0..."
+  }
+  TTL: 3600 seconds (1 hour)
+end note
+
+Redis --> Auth: Session created
+Auth --> Client: {access_token, refresh_token}
+
+== Session Validation (Every Request) ==
+Client -> MW: GET /api/resource\nHeader: Authorization: Bearer {token}
+MW -> MW: Extract JWT from header
+MW -> MW: Verify JWT signature
+MW -> MW: Check token expiration
+MW -> MW: Extract user_id from claims
+
+MW -> Redis: Get session\nKey: session:{user_id}
+alt Session exists
+    Redis --> MW: Session data
+    MW -> MW: Verify session not expired
+    MW -> MW: Optional: Check IP/User-Agent\n(if strict session validation enabled)
+    alt Session valid
+        MW -> MW: Add user context to request:\n- user_id\n- tenant_id\n- email\n- roles
+        MW -> Client: Request proceeds to handler
+    else Session expired or invalid
+        MW --> Client: 401 Unauthorized\nSession expired
+    end
+else Session not found
+    MW --> Client: 401 Unauthorized\nSession not found
+end
+
+== Session Extension (On Activity) ==
+Client -> MW: API request (user active)
+MW -> Redis: Check session TTL
+Redis --> MW: TTL: 300 seconds remaining
+
+alt TTL < 10 minutes
+    MW -> Redis: Extend session TTL\nEXPIRE session:{user_id} 3600
+    note right of Redis
+      Extend session on user activity
+      to maintain seamless experience
+    end note
+    Redis --> MW: TTL extended
+end
+
+MW -> Client: Request completed
+
+== Token Refresh and Session Update ==
+Client -> Auth: POST /auth/refresh\n{refresh_token}
+Auth -> DB: Validate refresh token
+DB --> Auth: Token valid, user data
+
+Auth -> Auth: Generate new JWT tokens
+Auth -> Redis: Update session
+note right of Redis
+  Update session with new tokens
+  and reset expiration time
+end note
+
+Auth -> Redis: SET session:{user_id}\nwith new data and TTL: 3600
+Redis --> Auth: Session updated
+Auth --> Client: {new_access_token, new_refresh_token}
+
+== Concurrent Session Management ==
+note over Auth, Redis
+  System can be configured to:
+  1. Allow unlimited sessions (default)
+  2. Limit to N active sessions per user
+  3. Single session only (logout others)
+end note
+
+Client -> Auth: Login request (new device)
+Auth -> Redis: Check active sessions\nKEYS session:{user_id}:*
+Redis --> Auth: List of active sessions
+
+alt Multiple sessions allowed
+    Auth -> Redis: Create new session\nKey: session:{user_id}:{session_id}
+    Auth --> Client: Login successful
+else Single session only
+    Auth -> Redis: Delete all existing sessions\nDEL session:{user_id}:*
+    Auth -> DB: Revoke all refresh tokens
+    Auth -> Redis: Create new session
+    Auth --> Client: Login successful\n(other devices logged out)
+end
+
+== Session Logout ==
+Client -> Auth: POST /auth/logout
+Auth -> Auth: Extract user_id from token
+
+Auth -> Redis: Delete session\nDEL session:{user_id}
+Redis --> Auth: Session deleted
+Auth -> DB: Revoke refresh token
+Auth --> Client: Logout successful
+
+== Background Session Cleanup ==
+note over Redis
+  Redis automatically handles TTL expiration.
+  Sessions are cleaned up when they expire.
+  
+  No manual cleanup job needed for Redis.
+end note
+
+== Session Monitoring ==
+Auth -> Redis: SCAN for all sessions
+Redis --> Auth: List of active sessions
+
+loop For each session
+    Auth -> Redis: GET session:{user_id}
+    Redis --> Auth: Session data
+    Auth -> Auth: Check session health:\n- Expiration time\n- Last activity\n- Suspicious patterns
+    
+    alt Session compromised
+        Auth -> Redis: DEL session:{user_id}
+        Auth -> DB: Revoke associated tokens
+        Auth -> Email: Send security alert
+    end
+end
+
+== Session Analytics ==
+Auth -> Redis: Get all active sessions
+Redis --> Auth: Session count: 1,523
+
+Auth -> Auth: Aggregate metrics:\n- Active users\n- Sessions per user\n- Average session duration\n- Geographical distribution\n- Device types
+
+Auth -> DB: Store analytics\n{date, active_sessions, metrics}
+
+== Multi-Device Session Management ==
+note over Client, Redis
+  User sessions tracked per device
+  Key pattern: session:{user_id}:{device_id}
+  
+  Example:
+  - session:507f...:web_chrome_mac
+  - session:507f...:mobile_ios
+  - session:507f...:mobile_android
+end note
+
+Client -> Auth: POST /auth/sessions (list devices)
+Auth -> Redis: KEYS session:{user_id}:*
+Redis --> Auth: All user sessions
+Auth --> Client: {
+  sessions: [
+    {device: "Chrome on Mac", last_active: "...", ip: "..."},
+    {device: "iOS App", last_active: "...", ip: "..."}
+  ]
+}
+
+Client -> Auth: POST /auth/sessions/revoke\n{device_id}
+Auth -> Redis: DEL session:{user_id}:{device_id}
+Auth --> Client: Session revoked
+
+== Security Features ==
+note over Auth, Redis
+  1. Automatic expiration (TTL)
+  2. Activity-based extension
+  3. Session validation on every request
+  4. IP and User-Agent tracking
+  5. Concurrent session control
+  6. Real-time revocation
+  7. Session monitoring and alerts
+  8. Device-specific sessions
+  9. Anomaly detection
+  10. Encrypted session data (optional)
+end note
+
+@enduml
