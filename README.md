@@ -4,40 +4,39 @@
 
 ## Description
 
-A robust, production-ready authentication and authorization microservice built with Go. This service provides comprehensive authentication flows including JWT token management, OAuth2 integration, 2FA support, session management, and role-based access control (RBAC).
+A comprehensive authentication and authorization service built with Go, providing secure user authentication, JWT token management, OAuth2 integration, and multi-factor authentication support. This service is designed for multi-tenant SaaS applications with enterprise-grade security features.
 
 ## Features
 
 ### Core Authentication
-- 🔐 **User Registration & Login**: Secure user authentication with password hashing (bcrypt)
-- 🎟️ **JWT Token Management**: Access and refresh token generation, validation, and rotation
-- 🔄 **Token Refresh**: Seamless token refresh mechanism for continuous sessions
-- 🚪 **Logout**: Secure token revocation and session cleanup
+- **User Registration & Login**: Secure user registration with email verification and login with JWT tokens
+- **Password Management**: Secure password hashing with bcrypt, password reset, and email verification flows
+- **JWT Token Management**: Access and refresh token generation, validation, and revocation
+- **Session Management**: Redis-based session storage with automatic expiration
 
-### OAuth2 Integration
-- 🌐 **OAuth2 Support**: Ready for Google, GitHub, and custom OAuth providers
-- 🔗 **Account Linking**: Link multiple OAuth accounts to a single user
-- 🔓 **Social Login**: Simplified login flow with popular identity providers
+### OAuth2 & SSO
+- **OAuth2 Integration**: Support for Google, GitHub, and other OAuth2 providers
+- **Social Login**: One-click authentication with social media accounts
+- **SSO Support**: Enterprise Single Sign-On integration capabilities
 
 ### Security Features
-- 🛡️ **Password Security**: bcrypt hashing with configurable cost factor
-- 🔒 **Session Management**: Redis-based session storage with TTL
-- 🎯 **Role-Based Access Control (RBAC)**: Fine-grained permissions system
-- 🚦 **Rate Limiting**: Protection against brute force attacks
-- 🔍 **Audit Logging**: Comprehensive authentication event logging
-- 🛑 **Account Lockout**: Automatic account protection after failed attempts
+- **Multi-Factor Authentication (MFA)**: TOTP-based two-factor authentication support
+- **Token Refresh Mechanism**: Automatic token refresh with refresh tokens
+- **Rate Limiting**: Brute force protection with configurable rate limits
+- **Token Blacklist**: Secure logout with token revocation and blacklisting
+- **Password Policies**: Configurable password complexity requirements
 
-### Multi-tenancy
-- 🏢 **Tenant Isolation**: Complete data isolation per tenant
-- 🔑 **Tenant-specific Roles**: Flexible role assignment per tenant
-- ⚙️ **Tenant Configuration**: Custom auth policies per tenant
+### Authorization
+- **Role-Based Access Control (RBAC)**: Fine-grained permission management
+- **Multi-tenancy**: Tenant isolation and tenant-specific role management
+- **Permission System**: Granular resource and action-based permissions
 
 ## Prerequisites
 
 - Go 1.25+
-- MongoDB 4.4+ (for user data, roles, and tokens storage)
-- Redis 6.0+ (for session and cache management)
-- Docker & Docker Compose (optional, for containerized deployment)
+- MongoDB 4.4+ (if applicable)
+- Redis 6.0+ (if applicable)
+- RabbitMQ 3.9+ (if applicable)
 
 ## Installation
 
@@ -261,92 +260,80 @@ Protection against brute force and abuse:
 
 ## API Documentation
 
-### REST API Endpoints
+The service provides both gRPC and HTTP/REST APIs for maximum flexibility.
 
-#### Authentication Endpoints
+### Authentication Flows
 
-**POST `/api/v1/auth/register`**
-```bash
-curl -X POST http://localhost:8081/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "SecurePass123!",
-    "tenant_id": "tenant_123"
-  }'
+#### 1. User Registration Flow
+```
+Client -> POST /api/v1/auth/register
+       <- 201 Created (with verification email sent)
+Client -> Click verification link
+       -> GET /api/v1/auth/verify?token=xxx
+       <- 200 OK (email verified)
 ```
 
-Response:
-```json
-{
-  "access_token": "eyJhbGc...",
-  "refresh_token": "eyJhbGc...",
-  "expires_in": 3600,
-  "token_type": "Bearer",
-  "user": {
-    "id": "507f1f77bcf86cd799439011",
-    "email": "user@example.com",
-    "tenant_id": "tenant_123",
-    "roles": ["user"]
-  }
-}
+#### 2. Login Flow
+```
+Client -> POST /api/v1/auth/login {email, password}
+       <- 200 OK {access_token, refresh_token, expires_in}
+Client -> Store tokens securely
 ```
 
-**POST `/api/v1/auth/login`**
-```bash
-curl -X POST http://localhost:8081/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "SecurePass123!",
-    "tenant_id": "tenant_123"
-  }'
+#### 3. Token Refresh Flow
+```
+Client -> POST /api/v1/auth/refresh {refresh_token}
+       <- 200 OK {access_token, refresh_token, expires_in}
 ```
 
-**POST `/api/v1/auth/refresh`**
-```bash
-curl -X POST http://localhost:8081/api/v1/auth/refresh \
-  -H "Content-Type: application/json" \
-  -d '{
-    "refresh_token": "eyJhbGc..."
-  }'
+#### 4. OAuth2 Flow
+```
+Client -> GET /api/v1/auth/oauth/google
+       <- 302 Redirect to Google
+User   -> Authorize on Google
+       <- 302 Redirect to callback
+Client -> GET /api/v1/auth/oauth/google/callback?code=xxx
+       <- 200 OK {access_token, refresh_token, expires_in}
 ```
 
-**POST `/api/v1/auth/logout`**
-```bash
-curl -X POST http://localhost:8081/api/v1/auth/logout \
-  -H "Authorization: Bearer eyJhbGc..." \
-  -H "Content-Type: application/json" \
-  -d '{
-    "refresh_token": "eyJhbGc..."
-  }'
+#### 5. MFA Flow
+```
+Client -> POST /api/v1/auth/mfa/enable
+       <- 200 OK {qr_code, secret}
+Client -> Scan QR code with authenticator app
+       -> POST /api/v1/auth/mfa/verify {code}
+       <- 200 OK (MFA enabled)
+       
+Login with MFA:
+Client -> POST /api/v1/auth/login {email, password}
+       <- 200 OK {mfa_token, requires_mfa: true}
+       -> POST /api/v1/auth/mfa/authenticate {mfa_token, code}
+       <- 200 OK {access_token, refresh_token}
 ```
 
-#### Health Check Endpoints
-
-**GET `/health`**
-```bash
-curl http://localhost:8081/health
+#### 6. Password Reset Flow
+```
+Client -> POST /api/v1/auth/forgot-password {email}
+       <- 200 OK (reset email sent)
+Client -> Click reset link
+       -> POST /api/v1/auth/reset-password {token, new_password}
+       <- 200 OK (password updated)
 ```
 
-**GET `/ready`**
-```bash
-curl http://localhost:8081/ready
-```
+### API Endpoints
 
-### gRPC API
+See [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) for complete API documentation including gRPC endpoints and HTTP/REST endpoints.
 
-The service exposes gRPC endpoints on port 50051:
+### Security Best Practices
 
-- `AuthService.Register`
-- `AuthService.Login`
-- `AuthService.RefreshToken`
-- `AuthService.ValidateToken`
-- `AuthService.Logout`
-- `AuthService.GetUserRoles`
-- `AuthService.CheckPermission`
-
-See `proto/auth.proto` for complete API definitions.
+1. **Token Storage**: Store access tokens in memory and refresh tokens in secure HTTP-only cookies
+2. **HTTPS Only**: Always use HTTPS in production to prevent token interception
+3. **Token Expiration**: Access tokens expire in 15 minutes, refresh tokens in 7 days
+4. **Rate Limiting**: Implement client-side rate limiting to avoid being blocked
+5. **MFA**: Enable MFA for sensitive accounts
+6. **Password Policy**: Enforce strong passwords (min 8 chars, uppercase, lowercase, numbers, special chars)
+7. **Token Revocation**: Implement logout to revoke tokens on the server side
+8. **CORS**: Configure CORS properly to prevent unauthorized domains from accessing your API
 
 ## Deployment
 

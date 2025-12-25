@@ -1,192 +1,291 @@
 @startuml Session Management
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam backgroundColor #FEFEFE
+skinparam shadowing false
 
-title Session Management - Creation, Validation, and Cleanup
+title Session Management - Creation, Validation, and Expiration
 
-participant "Client" as Client
+actor User
+participant "Client App" as Client
+participant "API Gateway" as Gateway
 participant "Auth Service" as Auth
-participant "Middleware" as MW
-database "Redis Cache" as Redis
-database "MongoDB" as DB
+participant "Resource Service" as Resource
+database MongoDB
+database Redis
 
-== Session Creation (On Login) ==
-Client -> Auth: POST /auth/login\n{email, password}
-Auth -> DB: Authenticate user
-DB --> Auth: User data {id, email, tenant_id, roles}
+== Session Creation (After Login) ==
 
-Auth -> Auth: Generate JWT tokens
-Auth -> Redis: Create session
-note right of Redis
-  Key: session:{user_id}
-  Value: {
-    user_id: "507f...",
-    tenant_id: "tenant_123",
+User -> Client: Login with credentials
+Client -> Auth: POST /api/v1/auth/login\n{email, password}
+
+Auth -> Auth: Authenticate user
+Auth -> MongoDB: Get user data\n{user_id, roles, permissions}
+MongoDB --> Auth: User data
+
+Auth -> Auth: Generate session ID\n(UUID v4)
+Auth -> Auth: Generate JWT access token\n{\n  jti: session_id,\n  user_id,\n  exp: now() + 15min\n}
+
+Auth -> Auth: Generate refresh token\n(secure random 32 bytes)
+
+Auth -> Auth: Create session data
+note right
+  Session Structure:
+  {
+    session_id: "uuid",
+    user_id: "123",
     email: "user@example.com",
     roles: ["user", "admin"],
-    created_at: "2023-12-25T10:00:00Z",
-    expires_at: "2023-12-25T11:00:00Z",
-    ip_address: "192.168.1.100",
-    user_agent: "Mozilla/5.0..."
+    permissions: ["read", "write"],
+    tenant_id: "tenant-1",
+    ip_address: "192.168.1.1",
+    user_agent: "Mozilla/5.0...",
+    created_at: timestamp,
+    last_accessed: timestamp,
+    expires_at: timestamp
   }
-  TTL: 3600 seconds (1 hour)
 end note
 
-Redis --> Auth: Session created
-Auth --> Client: {access_token, refresh_token}
+Auth -> Redis: Create session\nKey: "session:{session_id}"\nValue: session_data\nTTL: 15 minutes
+Redis --> Auth: Session stored
 
-== Session Validation (Every Request) ==
-Client -> MW: GET /api/resource\nHeader: Authorization: Bearer {token}
-MW -> MW: Extract JWT from header
-MW -> MW: Verify JWT signature
-MW -> MW: Check token expiration
-MW -> MW: Extract user_id from claims
+Auth -> Redis: Add to user sessions index\nKey: "user_sessions:{user_id}"\nValue: Set of session_ids
+Redis --> Auth: Added to index
 
-MW -> Redis: Get session\nKey: session:{user_id}
-alt Session exists
-    Redis --> MW: Session data
-    MW -> MW: Verify session not expired
-    MW -> MW: Optional: Check IP/User-Agent\n(if strict session validation enabled)
-    alt Session valid
-        MW -> MW: Add user context to request:\n- user_id\n- tenant_id\n- email\n- roles
-        MW -> Client: Request proceeds to handler
-    else Session expired or invalid
-        MW --> Client: 401 Unauthorized\nSession expired
+Auth -> MongoDB: Store refresh token\n{\n  token_hash,\n  user_id,\n  session_id,\n  expires_at: now() + 7 days\n}
+MongoDB --> Auth: Stored
+
+Auth --> Client: 200 OK\n{\n  access_token: "eyJ...",\n  refresh_token: "abc123",\n  session_id: "uuid",\n  expires_in: 900\n}
+
+Client -> Client: Store tokens\n- access_token in memory\n- refresh_token in httpOnly cookie\n- session_id in localStorage
+
+Client --> User: Login successful
+
+== Session Validation (API Request) ==
+
+User -> Client: Click button (API call needed)
+Client -> Gateway: GET /api/v1/users/profile\nAuthorization: Bearer eyJ...\nX-Session-ID: uuid
+
+Gateway -> Auth: Validate token (gRPC)\n{token, session_id}
+
+Auth -> Auth: Decode JWT\n{jti, user_id, exp}
+
+Auth -> Auth: Verify JWT signature
+Auth -> Auth: Check expiration
+
+alt Token expired
+    Auth --> Gateway: Token expired
+    Gateway --> Client: 401 Unauthorized\n{error: "token_expired"}
+    Client -> Client: Attempt token refresh
+else Token valid
+    Auth -> Redis: Check token blacklist\nKey: "blacklist:{jti}"
+    Redis --> Auth: Not blacklisted
+    
+    Auth -> Redis: Get session\nKey: "session:{session_id}"
+    Redis --> Auth: Session data
+    
+    alt Session not found
+        Auth --> Gateway: Session expired
+        Gateway --> Client: 401 Unauthorized
+        Client -> Client: Redirect to login
+    else Session found
+        Auth -> Auth: Verify session ownership\n(user_id matches token)
+        Auth -> Auth: Check session expiration
+        
+        alt Session expired
+            Auth -> Redis: Delete expired session
+            Auth --> Gateway: Session expired
+            Gateway --> Client: 401 Unauthorized
+        else Session valid
+            Auth -> Auth: Update last_accessed timestamp
+            Auth -> Redis: Update session\nKey: "session:{session_id}"\nReset TTL: 15 minutes
+            
+            Auth --> Gateway: Valid\n{\n  user_id,\n  roles,\n  permissions,\n  tenant_id\n}
+            Gateway -> Gateway: Add user context to request
+            Gateway -> Resource: Forward request with context
+            Resource --> Gateway: Response
+            Gateway --> Client: Response
+            Client --> User: Show data
+        end
     end
-else Session not found
-    MW --> Client: 401 Unauthorized\nSession not found
 end
 
-== Session Extension (On Activity) ==
-Client -> MW: API request (user active)
-MW -> Redis: Check session TTL
-Redis --> MW: TTL: 300 seconds remaining
+== Session Extension (Activity-based) ==
 
-alt TTL < 10 minutes
-    MW -> Redis: Extend session TTL\nEXPIRE session:{user_id} 3600
-    note right of Redis
-      Extend session on user activity
-      to maintain seamless experience
-    end note
-    Redis --> MW: TTL extended
+note over Client, Redis
+  Session automatically extends on activity
+  using sliding expiration window
+end note
+
+Client -> Gateway: Any API request\nAuthorization: Bearer eyJ...
+
+Gateway -> Auth: Validate and extend session
+
+Auth -> Redis: Get session\nKey: "session:{session_id}"
+Redis --> Auth: Session data
+
+Auth -> Auth: Check if session near expiry\n(< 5 minutes remaining)
+
+alt Session expiring soon
+    Auth -> Redis: Extend session TTL\nKey: "session:{session_id}"\nNew TTL: 15 minutes
+    Redis --> Auth: TTL extended
+    
+    Auth --> Gateway: Valid + {new_expiry}
+    Gateway --> Client: + Header:\nX-Session-Extended: true
+    Client -> Client: Update local expiry timer
+else Session has time remaining
+    Auth --> Gateway: Valid
+    Gateway --> Client: Response
 end
 
-MW -> Client: Request completed
+== Session Refresh (Token Expired, Session Valid) ==
 
-== Token Refresh and Session Update ==
-Client -> Auth: POST /auth/refresh\n{refresh_token}
-Auth -> DB: Validate refresh token
-DB --> Auth: Token valid, user data
+Client -> Client: Access token expired
+Client -> Auth: POST /api/v1/auth/refresh\n{\n  refresh_token: "abc123",\n  session_id: "uuid"\n}
 
-Auth -> Auth: Generate new JWT tokens
-Auth -> Redis: Update session
-note right of Redis
-  Update session with new tokens
-  and reset expiration time
-end note
+Auth -> Auth: Hash refresh token
+Auth -> MongoDB: Verify refresh token\n{\n  token_hash,\n  revoked_at: null,\n  expires_at > now()\n}
+MongoDB --> Auth: Token valid + user_id
 
-Auth -> Redis: SET session:{user_id}\nwith new data and TTL: 3600
-Redis --> Auth: Session updated
-Auth --> Client: {new_access_token, new_refresh_token}
+Auth -> Redis: Get session\nKey: "session:{session_id}"
+Redis --> Auth: Session data
 
-== Concurrent Session Management ==
-note over Auth, Redis
-  System can be configured to:
-  1. Allow unlimited sessions (default)
-  2. Limit to N active sessions per user
-  3. Single session only (logout others)
-end note
-
-Client -> Auth: Login request (new device)
-Auth -> Redis: Check active sessions\nKEYS session:{user_id}:*
-Redis --> Auth: List of active sessions
-
-alt Multiple sessions allowed
-    Auth -> Redis: Create new session\nKey: session:{user_id}:{session_id}
-    Auth --> Client: Login successful
-else Single session only
-    Auth -> Redis: Delete all existing sessions\nDEL session:{user_id}:*
-    Auth -> DB: Revoke all refresh tokens
-    Auth -> Redis: Create new session
-    Auth --> Client: Login successful\n(other devices logged out)
+alt Session not found or user mismatch
+    Auth -> MongoDB: Revoke refresh token\n(security: token stolen?)
+    Auth --> Client: 401 Unauthorized
+    Client --> User: Please login again
+else Session valid
+    Auth -> Auth: Generate new access token\n(same session_id in jti)
+    Auth -> Auth: Generate new refresh token
+    
+    Auth -> MongoDB: Revoke old refresh token
+    Auth -> MongoDB: Store new refresh token
+    
+    Auth -> Redis: Extend session\nKey: "session:{session_id}"\nTTL: 15 minutes
+    
+    Auth --> Client: 200 OK\n{\n  access_token: "eyJ...",\n  refresh_token: "xyz789",\n  expires_in: 900\n}
+    Client -> Client: Update tokens
 end
 
-== Session Logout ==
-Client -> Auth: POST /auth/logout
-Auth -> Auth: Extract user_id from token
+== Session Termination (Logout) ==
 
-Auth -> Redis: Delete session\nDEL session:{user_id}
-Redis --> Auth: Session deleted
-Auth -> DB: Revoke refresh token
-Auth --> Client: Logout successful
+User -> Client: Click logout
+Client -> Auth: POST /api/v1/auth/logout\nAuthorization: Bearer eyJ...\nX-Session-ID: uuid
 
-== Background Session Cleanup ==
-note over Redis
-  Redis automatically handles TTL expiration.
-  Sessions are cleaned up when they expire.
-  
-  No manual cleanup job needed for Redis.
-end note
+Auth -> Auth: Validate token
+Auth -> Auth: Extract session_id from token
 
-== Session Monitoring ==
-Auth -> Redis: SCAN for all sessions
-Redis --> Auth: List of active sessions
+Auth -> Redis: Get session\nKey: "session:{session_id}"
+Redis --> Auth: Session data
+
+Auth -> Redis: Delete session\nKey: "session:{session_id}"
+Redis --> Auth: Deleted
+
+Auth -> Redis: Remove from user sessions\nKey: "user_sessions:{user_id}"\nRemove: session_id
+Redis --> Auth: Removed
+
+Auth -> Auth: Calculate token remaining TTL
+Auth -> Redis: Add token to blacklist\nKey: "blacklist:{jti}"\nTTL: remaining token time
+Redis --> Auth: Blacklisted
+
+Auth -> MongoDB: Revoke refresh token\n{session_id, revoked_at: now()}
+MongoDB --> Auth: Revoked
+
+Auth -> MongoDB: Log logout event\n{\n  user_id,\n  session_id,\n  logout_time,\n  ip_address\n}
+
+Auth --> Client: 200 OK\n{message: "Logged out"}
+Client -> Client: Clear all tokens
+Client --> User: Redirect to login
+
+== Session Cleanup (Background Job) ==
+
+participant "Cleanup Job" as Cleanup
+
+Cleanup -> Redis: Scan for expired sessions\nPATTERN "session:*"
+Redis --> Cleanup: List of session keys
 
 loop For each session
-    Auth -> Redis: GET session:{user_id}
-    Redis --> Auth: Session data
-    Auth -> Auth: Check session health:\n- Expiration time\n- Last activity\n- Suspicious patterns
+    Cleanup -> Redis: TTL "session:{session_id}"
+    Redis --> Cleanup: -2 (expired/deleted)
     
-    alt Session compromised
-        Auth -> Redis: DEL session:{user_id}
-        Auth -> DB: Revoke associated tokens
-        Auth -> Email: Send security alert
+    alt Session expired
+        Cleanup -> Redis: Remove from user index\nif still exists
+        Cleanup -> MongoDB: Mark refresh token as expired
     end
 end
 
-== Session Analytics ==
-Auth -> Redis: Get all active sessions
-Redis --> Auth: Session count: 1,523
+Cleanup -> MongoDB: Delete old refresh tokens\n{expires_at < now() - 30 days}
+MongoDB --> Cleanup: Deleted count
 
-Auth -> Auth: Aggregate metrics:\n- Active users\n- Sessions per user\n- Average session duration\n- Geographical distribution\n- Device types
+Cleanup -> Redis: Delete expired blacklist entries\n(Redis TTL handles this automatically)
 
-Auth -> DB: Store analytics\n{date, active_sessions, metrics}
+== Multi-Session Management ==
 
-== Multi-Device Session Management ==
-note over Client, Redis
-  User sessions tracked per device
-  Key pattern: session:{user_id}:{device_id}
-  
-  Example:
-  - session:507f...:web_chrome_mac
-  - session:507f...:mobile_ios
-  - session:507f...:mobile_android
-end note
+User -> Client: View active sessions
+Client -> Auth: GET /api/v1/auth/sessions\nAuthorization: Bearer eyJ...
 
-Client -> Auth: POST /auth/sessions (list devices)
-Auth -> Redis: KEYS session:{user_id}:*
-Redis --> Auth: All user sessions
-Auth --> Client: {
-  sessions: [
-    {device: "Chrome on Mac", last_active: "...", ip: "..."},
-    {device: "iOS App", last_active: "...", ip: "..."}
-  ]
-}
+Auth -> Auth: Validate token
+Auth -> Redis: Get user sessions\nKey: "user_sessions:{user_id}"
+Redis --> Auth: Set of session_ids
 
-Client -> Auth: POST /auth/sessions/revoke\n{device_id}
-Auth -> Redis: DEL session:{user_id}:{device_id}
-Auth --> Client: Session revoked
+Auth -> Redis: Get session details\nfor each session_id
+Redis --> Auth: Session data array
 
-== Security Features ==
+Auth -> Auth: Enrich with geolocation\nfrom IP addresses
+
+Auth --> Client: 200 OK\n[\n  {\n    session_id: "uuid1",\n    device: "Chrome on Windows",\n    ip: "192.168.1.1",\n    location: "New York, US",\n    last_active: "2 minutes ago",\n    is_current: true\n  },\n  {...}\n]
+
+Client --> User: Show active sessions list
+
+User -> Client: Revoke other session
+Client -> Auth: DELETE /api/v1/auth/sessions/{session_id}\nAuthorization: Bearer eyJ...
+
+Auth -> Auth: Validate token
+Auth -> Auth: Verify not revoking current session
+
+Auth -> Redis: Delete target session
+Auth -> Redis: Remove from user sessions
+Auth -> MongoDB: Revoke associated refresh tokens
+
+Auth --> Client: 200 OK
+Client --> User: Session terminated
+
+== Session Security Features ==
+
 note over Auth, Redis
-  1. Automatic expiration (TTL)
-  2. Activity-based extension
-  3. Session validation on every request
-  4. IP and User-Agent tracking
-  5. Concurrent session control
-  6. Real-time revocation
-  7. Session monitoring and alerts
-  8. Device-specific sessions
-  9. Anomaly detection
-  10. Encrypted session data (optional)
+  Security Measures:
+  
+  1. **Session Binding**:
+     - IP address validation (optional)
+     - User agent fingerprinting
+     - Device fingerprinting
+  
+  2. **Anomaly Detection**:
+     - Detect impossible travel
+     - Detect unusual access patterns
+     - Alert on suspicious activity
+  
+  3. **Concurrent Session Limits**:
+     - Max 5 sessions per user
+     - Oldest session auto-logged out
+  
+  4. **Session Fixation Prevention**:
+     - New session ID after login
+     - New session ID after privilege change
+  
+  5. **Absolute Timeout**:
+     - Max session duration: 24 hours
+     - Force re-authentication
+  
+  6. **Idle Timeout**:
+     - 15 minutes of inactivity
+     - Configurable per user role
+  
+  7. **Session Hijacking Protection**:
+     - HTTPS only
+     - Secure, HttpOnly cookies
+     - CSRF tokens
+     - Token binding
 end note
 
 @enduml

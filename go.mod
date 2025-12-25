@@ -12,7 +12,6 @@ toolchain go1.25.5
 require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/longvhv/saas-shared-go v0.0.0-20251225102734-2e93c644546c
-	github.com/stretchr/testify v1.11.1
 	go.mongodb.org/mongo-driver v1.17.6
 	go.uber.org/zap v1.27.1
 	google.golang.org/grpc v1.78.0
@@ -47,7 +46,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.58.0 // indirect
 	github.com/redis/go-redis/v9 v9.17.2 // indirect
@@ -74,7 +72,6 @@ require (
 	golang.org/x/text v0.32.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251222181119-0a764e51fe1b // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 // Replace directive to use the new vhvcorp/go-shared repository
