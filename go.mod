@@ -9,7 +9,7 @@
 // 4. Run: go mod tidy
 // 
 // Example transformation:
-//   Before: module github.com/longvhv/saas-framework-go/services/auth-service
+//   Before: module github.com/longvhv/saas-auth-service
 //   After:  module github.com/longvhv/saas-auth-service
 //
 //   Before: replace github.com/longvhv/saas-framework-go/pkg => ../../pkg
@@ -18,7 +18,7 @@
 //
 // See: docs/migration/services/auth-service/EXTRACTION_GUIDE.md
 // ============================================================================
-module github.com/longvhv/saas-framework-go/services/auth-service
+module github.com/longvhv/saas-auth-service
 
 go 1.24.0
 
@@ -89,6 +89,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/longvhv/saas-framework-go/pkg => ../../pkg
 
 exclude github.com/pelletier/go-toml/v3 v3.0.0
