@@ -56,14 +56,14 @@ func (s *AuthService) Register(ctx context.Context, req *domain.RegisterRequest)
 	if existingUser != nil {
 		return nil, errors.Conflict("User already exists with this email")
 	}
-	
+
 	// Hash password
 	passwordHash, err := utils.HashPassword(req.Password)
 	if err != nil {
 		s.logger.Error("Failed to hash password", zap.Error(err))
 		return nil, errors.Internal("Failed to register user")
 	}
-	
+
 	// Create user
 	user := &domain.User{
 		Email:        req.Email,
@@ -73,17 +73,17 @@ func (s *AuthService) Register(ctx context.Context, req *domain.RegisterRequest)
 		IsActive:     true,
 		IsVerified:   false,
 	}
-	
+
 	if err := s.userRepo.Create(ctx, user); err != nil {
 		s.logger.Error("Failed to create user", zap.Error(err))
 		return nil, errors.Internal("Failed to register user")
 	}
-	
-	s.logger.Info("User registered successfully", 
+
+	s.logger.Info("User registered successfully",
 		zap.String("user_id", user.ID.Hex()),
 		zap.String("email", user.Email),
 	)
-	
+
 	// Generate tokens
 	return s.generateTokens(ctx, user)
 }
@@ -93,13 +93,13 @@ func (s *AuthService) Login(ctx context.Context, req *domain.LoginRequest) (*dom
 	// Find user
 	var user *domain.User
 	var err error
-	
+
 	if req.TenantID != "" {
 		user, err = s.userRepo.FindByEmailAndTenant(ctx, req.Email, req.TenantID)
 	} else {
 		user, err = s.userRepo.FindByEmail(ctx, req.Email)
 	}
-	
+
 	if err != nil {
 		s.logger.Error("Failed to find user", zap.Error(err))
 		return nil, errors.Internal("Failed to login")
@@ -107,27 +107,27 @@ func (s *AuthService) Login(ctx context.Context, req *domain.LoginRequest) (*dom
 	if user == nil {
 		return nil, errors.Unauthorized("Invalid email or password")
 	}
-	
+
 	// Check if user is active
 	if !user.IsActive {
 		return nil, errors.Forbidden("User account is deactivated")
 	}
-	
+
 	// Verify password
 	if !utils.CheckPassword(req.Password, user.PasswordHash) {
 		return nil, errors.Unauthorized("Invalid email or password")
 	}
-	
+
 	// Update last login
 	if err := s.userRepo.UpdateLastLogin(ctx, user.ID.Hex()); err != nil {
 		s.logger.Warn("Failed to update last login", zap.Error(err))
 	}
-	
-	s.logger.Info("User logged in successfully", 
+
+	s.logger.Info("User logged in successfully",
 		zap.String("user_id", user.ID.Hex()),
 		zap.String("email", user.Email),
 	)
-	
+
 	// Generate tokens
 	return s.generateTokens(ctx, user)
 }
@@ -140,13 +140,13 @@ func (s *AuthService) Logout(ctx context.Context, userID, refreshToken string) e
 			s.logger.Error("Failed to revoke refresh token", zap.Error(err))
 		}
 	}
-	
+
 	// Remove session from Redis
 	sessionKey := fmt.Sprintf("session:%s", userID)
 	if err := s.redisClient.Delete(ctx, sessionKey); err != nil {
 		s.logger.Error("Failed to delete session", zap.Error(err))
 	}
-	
+
 	s.logger.Info("User logged out", zap.String("user_id", userID))
 	return nil
 }
@@ -162,7 +162,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshTokenStr string) 
 	if token == nil {
 		return nil, errors.Unauthorized("Invalid refresh token")
 	}
-	
+
 	// Get user
 	user, err := s.userRepo.FindByID(ctx, token.UserID)
 	if err != nil {
@@ -172,7 +172,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshTokenStr string) 
 	if user == nil {
 		return nil, errors.Unauthorized("User not found")
 	}
-	
+
 	// Generate new tokens
 	return s.generateTokens(ctx, user)
 }
@@ -195,12 +195,12 @@ func (s *AuthService) GetUserRoles(ctx context.Context, userID, tenantID string)
 	if user == nil {
 		return nil, nil, errors.NotFound("User not found")
 	}
-	
+
 	permissions, err := s.roleRepo.GetPermissionsForRoles(ctx, user.Roles, tenantID)
 	if err != nil {
 		return nil, nil, err
 	}
-	
+
 	return user.Roles, permissions, nil
 }
 
@@ -210,28 +210,28 @@ func (s *AuthService) CheckPermission(ctx context.Context, userID, tenantID, per
 	if err != nil {
 		return false, err
 	}
-	
+
 	return utils.Contains(permissions, permission), nil
 }
 
 // generateTokens generates access and refresh tokens
 func (s *AuthService) generateTokens(ctx context.Context, user *domain.User) (*domain.LoginResponse, error) {
 	userID := user.ID.Hex()
-	
+
 	// Generate access token
 	accessToken, err := s.jwtManager.GenerateToken(userID, user.TenantID, user.Email, user.Roles)
 	if err != nil {
 		s.logger.Error("Failed to generate access token", zap.Error(err))
 		return nil, errors.Internal("Failed to generate tokens")
 	}
-	
+
 	// Generate refresh token
 	refreshToken, err := s.jwtManager.GenerateRefreshToken(userID, user.TenantID)
 	if err != nil {
 		s.logger.Error("Failed to generate refresh token", zap.Error(err))
 		return nil, errors.Internal("Failed to generate tokens")
 	}
-	
+
 	// Store refresh token in database
 	refreshTokenDoc := &domain.RefreshToken{
 		UserID:    userID,
@@ -241,7 +241,7 @@ func (s *AuthService) generateTokens(ctx context.Context, user *domain.User) (*d
 	if err := s.refreshTokenRepo.Create(ctx, refreshTokenDoc); err != nil {
 		s.logger.Error("Failed to store refresh token", zap.Error(err))
 	}
-	
+
 	// Store session in Redis
 	session := &domain.Session{
 		UserID:    userID,
@@ -256,7 +256,7 @@ func (s *AuthService) generateTokens(ctx context.Context, user *domain.User) (*d
 	if err := s.redisClient.Set(ctx, sessionKey, sessionData, 1*time.Hour); err != nil {
 		s.logger.Warn("Failed to store session in Redis", zap.Error(err))
 	}
-	
+
 	return &domain.LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,

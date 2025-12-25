@@ -32,13 +32,13 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		h.respondError(c, errors.BadRequest("Invalid request body"))
 		return
 	}
-	
+
 	resp, err := h.authService.Register(c.Request.Context(), &req)
 	if err != nil {
 		h.respondError(c, err)
 		return
 	}
-	
+
 	c.JSON(http.StatusCreated, gin.H{"data": resp})
 }
 
@@ -49,13 +49,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		h.respondError(c, errors.BadRequest("Invalid request body"))
 		return
 	}
-	
+
 	resp, err := h.authService.Login(c.Request.Context(), &req)
 	if err != nil {
 		h.respondError(c, err)
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{"data": resp})
 }
 
@@ -63,12 +63,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	userID := c.GetString("user_id")
 	refreshToken := c.GetHeader("X-Refresh-Token")
-	
+
 	if err := h.authService.Logout(c.Request.Context(), userID, refreshToken); err != nil {
 		h.respondError(c, err)
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
@@ -79,20 +79,20 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		h.respondError(c, errors.BadRequest("Invalid request body"))
 		return
 	}
-	
+
 	resp, err := h.authService.RefreshToken(c.Request.Context(), req.RefreshToken)
 	if err != nil {
 		h.respondError(c, err)
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, gin.H{"data": resp})
 }
 
 // respondError responds with an error
 func (h *AuthHandler) respondError(c *gin.Context, err error) {
 	appErr := errors.FromError(err)
-	h.logger.Error("Request failed", 
+	h.logger.Error("Request failed",
 		zap.String("path", c.Request.URL.Path),
 		zap.String("method", c.Request.Method),
 		zap.String("error", appErr.Message),

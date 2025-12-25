@@ -20,11 +20,11 @@ type UserRepository struct {
 // NewUserRepository creates a new user repository
 func NewUserRepository(db *mongo.Database) *UserRepository {
 	collection := db.Collection("users_auth")
-	
+
 	// Create indexes
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	indexes := []mongo.IndexModel{
 		{
 			Keys:    bson.D{{Key: "email", Value: 1}},
@@ -41,9 +41,9 @@ func NewUserRepository(db *mongo.Database) *UserRepository {
 			Options: options.Index().SetUnique(true),
 		},
 	}
-	
+
 	_, _ = collection.Indexes().CreateMany(ctx, indexes)
-	
+
 	return &UserRepository{collection: collection}
 }
 
@@ -51,12 +51,12 @@ func NewUserRepository(db *mongo.Database) *UserRepository {
 func (r *UserRepository) Create(ctx context.Context, user *domain.User) error {
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = time.Now()
-	
+
 	result, err := r.collection.InsertOne(ctx, user)
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
-	
+
 	user.ID = result.InsertedID.(primitive.ObjectID)
 	return nil
 }
@@ -96,7 +96,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*domain.User,
 	if err != nil {
 		return nil, fmt.Errorf("invalid user ID: %w", err)
 	}
-	
+
 	var user domain.User
 	err = r.collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&user)
 	if err != nil {
@@ -111,7 +111,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*domain.User,
 // Update updates a user
 func (r *UserRepository) Update(ctx context.Context, user *domain.User) error {
 	user.UpdatedAt = time.Now()
-	
+
 	_, err := r.collection.UpdateOne(
 		ctx,
 		bson.M{"_id": user.ID},
@@ -129,7 +129,7 @@ func (r *UserRepository) UpdateLastLogin(ctx context.Context, userID string) err
 	if err != nil {
 		return fmt.Errorf("invalid user ID: %w", err)
 	}
-	
+
 	now := time.Now()
 	_, err = r.collection.UpdateOne(
 		ctx,

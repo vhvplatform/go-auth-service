@@ -124,10 +124,10 @@ func TestLoginResponse_BearerToken(t *testing.T) {
 
 	// Verify token type is Bearer
 	assert.Equal(t, "Bearer", resp.TokenType)
-	
+
 	// Verify expiration is positive
 	assert.Greater(t, resp.ExpiresIn, 0)
-	
+
 	// Verify tokens are not empty
 	assert.NotEmpty(t, resp.AccessToken)
 	assert.NotEmpty(t, resp.RefreshToken)
