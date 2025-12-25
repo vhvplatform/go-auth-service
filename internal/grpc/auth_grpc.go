@@ -1,7 +1,7 @@
 package grpc
 
 import (
-	"github.com/vhvcorp/go-shared/logger"
+	"github.com/longvhv/saas-shared-go/logger"
 	"github.com/vhvcorp/go-auth-service/internal/service"
 	// pb "github.com/vhvcorp/go-auth-service/proto"
 )
