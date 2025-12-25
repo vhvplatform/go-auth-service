@@ -12,7 +12,7 @@ toolchain go1.24.11
 require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/longvhv/saas-shared-go v0.0.0-20251225102734-2e93c644546c
-	go.mongodb.org/mongo-driver v1.17.3
+	go.mongodb.org/mongo-driver v1.17.6
 	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.69.2
 )
