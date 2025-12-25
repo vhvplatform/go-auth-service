@@ -1,6 +1,6 @@
 # go-auth-service
 
-> Part of the SaaS Framework - Extracted from monorepo
+> Authentication and Authorization Service - Part of the SaaS Framework
 
 ## Description
 
@@ -98,6 +98,165 @@ make lint
 # Format code
 make fmt
 ```
+
+## Authentication Flows
+
+### 1. User Registration Flow
+```
+1. Client submits registration request (email, password, tenant_id)
+2. Service validates input and checks for existing user
+3. Password is hashed using bcrypt
+4. User record created in MongoDB with default roles
+5. Access and refresh tokens generated
+6. Session created in Redis
+7. Tokens returned to client
+```
+
+### 2. Login Flow
+```
+1. Client submits credentials (email, password, tenant_id)
+2. Service finds user by email and tenant
+3. Password verified against stored hash
+4. User account status checked (active, verified)
+5. Last login timestamp updated
+6. New JWT tokens generated
+7. Session stored in Redis with TTL
+8. Tokens and user info returned
+```
+
+### 3. Token Refresh Flow
+```
+1. Client sends expired access token + refresh token
+2. Service validates refresh token from database
+3. Checks token expiration and revocation status
+4. Retrieves associated user information
+5. Generates new access and refresh tokens
+6. Old refresh token revoked
+7. New tokens returned to client
+```
+
+### 4. Logout Flow
+```
+1. Client sends logout request with tokens
+2. Refresh token revoked in database
+3. Session removed from Redis cache
+4. User logged out successfully
+5. Client clears local tokens
+```
+
+### 5. OAuth2 Flow (Authorization Code)
+```
+1. Client redirects to OAuth provider
+2. User authenticates with provider
+3. Provider redirects back with authorization code
+4. Service exchanges code for access token
+5. User profile fetched from provider
+6. User created or linked in database
+7. Internal JWT tokens generated
+8. User authenticated in application
+```
+
+### 6. Token Validation Flow
+```
+1. Client includes JWT in Authorization header
+2. Middleware extracts and validates token signature
+3. Token expiration checked
+4. Claims extracted (user_id, tenant_id, roles)
+5. Optional: Session verified in Redis
+6. User context added to request
+7. Request proceeds to handler
+```
+
+## JWT Token Structure
+
+### Access Token Claims
+```json
+{
+  "sub": "user_id",
+  "tenant_id": "tenant_123",
+  "email": "user@example.com",
+  "roles": ["user", "admin"],
+  "exp": 1640000000,
+  "iat": 1639996400
+}
+```
+
+### Refresh Token Claims
+```json
+{
+  "sub": "user_id",
+  "tenant_id": "tenant_123",
+  "type": "refresh",
+  "exp": 1640604400,
+  "iat": 1639996400
+}
+```
+
+## Session Management
+
+Sessions are stored in Redis with the following structure:
+
+```json
+{
+  "user_id": "507f1f77bcf86cd799439011",
+  "tenant_id": "tenant_123",
+  "email": "user@example.com",
+  "roles": ["user"],
+  "created_at": "2023-12-20T10:00:00Z",
+  "expires_at": "2023-12-20T11:00:00Z"
+}
+```
+
+**Session Key Pattern**: `session:{user_id}`  
+**Default TTL**: 1 hour  
+**Refresh**: Automatic on token refresh
+
+## Password Security
+
+### Password Requirements
+- Minimum length: 8 characters
+- Must contain: uppercase, lowercase, number, special character
+- Maximum length: 128 characters
+- Common passwords blocked
+
+### Password Hashing
+- Algorithm: bcrypt
+- Cost factor: 12 (configurable)
+- Salted automatically
+- Timing-attack resistant comparison
+
+## Rate Limiting
+
+Protection against brute force and abuse:
+
+| Endpoint | Limit | Window |
+|----------|-------|--------|
+| `/auth/login` | 5 attempts | 1 minute |
+| `/auth/register` | 3 attempts | 1 hour |
+| `/auth/refresh` | 10 attempts | 1 minute |
+| `/auth/oauth/*` | 5 attempts | 1 minute |
+
+## Security Best Practices
+
+### For Developers
+1. **Always use HTTPS** in production
+2. **Store JWT secret securely** (environment variables, secrets manager)
+3. **Rotate secrets regularly** (at least every 90 days)
+4. **Implement token rotation** on refresh
+5. **Use short access token expiry** (15-60 minutes)
+6. **Validate all input** before processing
+7. **Log authentication events** for audit trails
+8. **Enable account lockout** after failed attempts
+
+### For Deployment
+1. **Use strong JWT secrets** (minimum 256 bits)
+2. **Enable Redis password** authentication
+3. **Restrict MongoDB access** with authentication
+4. **Use TLS for database connections**
+5. **Implement network policies** (firewall rules)
+6. **Regular security updates** for dependencies
+7. **Monitor for suspicious activity**
+8. **Backup authentication data** regularly
 
 ## API Documentation
 
