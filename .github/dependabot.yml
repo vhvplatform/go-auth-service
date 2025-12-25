@@ -8,7 +8,7 @@ updates:
       day: "monday"
     open-pull-requests-limit: 5
     reviewers:
-      - "longvhv"
+      - "vhvcorp"
     labels:
       - "dependencies"
       - "go"
@@ -22,7 +22,7 @@ updates:
     schedule:
       interval: "weekly"
     reviewers:
-      - "longvhv"
+      - "vhvcorp"
     labels:
       - "dependencies"
       - "github-actions"
@@ -33,7 +33,7 @@ updates:
     schedule:
       interval: "weekly"
     reviewers:
-      - "longvhv"
+      - "vhvcorp"
     labels:
       - "dependencies"
       - "docker"
