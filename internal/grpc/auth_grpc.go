@@ -35,7 +35,7 @@ func (s *AuthServiceServer) ValidateToken(ctx context.Context, req *pb.ValidateT
 			ErrorMessage: err.Error(),
 		}, nil
 	}
-	
+
 	return &pb.ValidateTokenResponse{
 		Valid:    true,
 		UserId:   claims.UserID,
@@ -52,7 +52,7 @@ func (s *AuthServiceServer) GetUserRoles(ctx context.Context, req *pb.GetUserRol
 		s.logger.Error("Failed to get user roles", zap.Error(err))
 		return nil, err
 	}
-	
+
 	return &pb.GetUserRolesResponse{
 		Roles:       roles,
 		Permissions: permissions,
@@ -66,7 +66,7 @@ func (s *AuthServiceServer) CheckPermission(ctx context.Context, req *pb.CheckPe
 		s.logger.Error("Failed to check permission", zap.Error(err))
 		return nil, err
 	}
-	
+
 	return &pb.CheckPermissionResponse{
 		Allowed: allowed,
 	}, nil
