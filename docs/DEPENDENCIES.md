@@ -1,6 +1,10 @@
 # Auth Service Dependencies
 
-## Shared Packages (from saas-shared-go)
+## Shared Packages (from vhvcorp/go-shared repository)
+
+**Note**: The vhvcorp/go-shared repository currently declares its module path as
+`github.com/longvhv/saas-shared-go`. Once it updates to `github.com/vhvcorp/go-shared`,
+the import paths below will be updated accordingly.
 
 ```go
 require (

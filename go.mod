@@ -1,24 +1,9 @@
+// NOTE: The go-shared repository (github.com/vhvcorp/go-shared) has not yet updated
+// its module path. It still declares itself as github.com/longvhv/saas-shared-go.
+// Therefore, we use the actual module path here. Once go-shared is updated to use
+// github.com/vhvcorp/go-shared as its module path, update this dependency accordingly.
 
-// ============================================================================
-// MIGRATION NOTE: Multi-Repo Extraction
-// ============================================================================
-// When extracting this service to a separate repository:
-// 1. Update module path to: github.com/longvhv/saas-auth-service
-// 2. Replace local pkg dependency with: github.com/longvhv/saas-shared-go v0.1.0
-// 3. Remove all replace directives pointing to ../pkg
-// 4. Run: go mod tidy
-// 
-// Example transformation:
-//   Before: module github.com/longvhv/saas-auth-service
-//   After:  module github.com/longvhv/saas-auth-service
-//
-//   Before: replace github.com/longvhv/saas-framework-go/pkg => ../../pkg
-//   After:  (remove replace directive)
-//           require github.com/longvhv/saas-shared-go v0.1.0
-//
-// See: docs/migration/services/auth-service/EXTRACTION_GUIDE.md
-// ============================================================================
-module github.com/longvhv/saas-auth-service
+module github.com/vhvcorp/go-auth-service
 
 go 1.24.0
 
@@ -26,7 +11,7 @@ toolchain go1.24.11
 
 require (
 	github.com/gin-gonic/gin v1.10.0
-	github.com/longvhv/saas-framework-go/pkg v0.0.0
+	github.com/longvhv/saas-shared-go v0.0.0-20251225102734-2e93c644546c
 	go.mongodb.org/mongo-driver v1.17.3
 	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.69.2
@@ -89,5 +74,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
+// Replace directive to use the new vhvcorp/go-shared repository
+// while it still declares itself as github.com/longvhv/saas-shared-go
+replace github.com/longvhv/saas-shared-go => github.com/vhvcorp/go-shared v0.0.0-20251225102734-2e93c644546c
 
 exclude github.com/pelletier/go-toml/v3 v3.0.0

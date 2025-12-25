@@ -11,8 +11,8 @@ import (
 	"github.com/longvhv/saas-shared-go/logger"
 	"github.com/longvhv/saas-shared-go/redis"
 	"github.com/longvhv/saas-shared-go/utils"
-	"github.com/longvhv/saas-framework-go/services/auth-service/internal/domain"
-	"github.com/longvhv/saas-framework-go/services/auth-service/internal/repository"
+	"github.com/vhvcorp/go-auth-service/internal/domain"
+	"github.com/vhvcorp/go-auth-service/internal/repository"
 	"go.uber.org/zap"
 )
 
