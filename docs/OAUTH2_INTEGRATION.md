@@ -243,7 +243,7 @@ package main
 import (
     "context"
     "fmt"
-    "github.com/vhvcorp/go-auth-service/client"
+    "github.com/vhvplatform/go-auth-service/client"
 )
 
 func main() {

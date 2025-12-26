@@ -42,7 +42,7 @@ A comprehensive authentication and authorization service built with Go, providin
 
 ```bash
 # Clone the repository
-git clone https://github.com/vhvcorp/go-auth-service.git
+git clone https://github.com/vhvplatform/go-auth-service.git
 cd go-auth-service
 
 # Install dependencies
@@ -349,8 +349,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ## Related Repositories
 
-- [go-shared](https://github.com/vhvcorp/go-shared) - Shared Go libraries
-- [saas-framework-go](https://github.com/vhvcorp/saas-framework-go) - Original monorepo
+- [go-shared](https://github.com/vhvplatform/go-shared) - Shared Go libraries
+- [saas-framework-go](https://github.com/vhvplatform/saas-framework-go) - Original monorepo
 
 ## License
 
@@ -358,6 +358,6 @@ MIT License - see [LICENSE](LICENSE) for details
 
 ## Support
 
-- Documentation: [Wiki](https://github.com/vhvcorp/go-auth-service/wiki)
-- Issues: [GitHub Issues](https://github.com/vhvcorp/go-auth-service/issues)
-- Discussions: [GitHub Discussions](https://github.com/vhvcorp/go-auth-service/discussions)
+- Documentation: [Wiki](https://github.com/vhvplatform/go-auth-service/wiki)
+- Issues: [GitHub Issues](https://github.com/vhvplatform/go-auth-service/issues)
+- Discussions: [GitHub Discussions](https://github.com/vhvplatform/go-auth-service/discussions)

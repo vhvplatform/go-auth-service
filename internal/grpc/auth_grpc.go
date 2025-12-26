@@ -1,9 +1,9 @@
 package grpc
 
 import (
-	"github.com/longvhv/saas-shared-go/logger"
-	"github.com/vhvcorp/go-auth-service/internal/service"
-	// pb "github.com/vhvcorp/go-auth-service/proto"
+	"github.com/vhvplatform/go-auth-service/internal/service"
+	"github.com/vhvplatform/go-shared/logger"
+	// pb "github.com/vhvplatform/go-auth-service/proto"
 )
 
 // AuthServiceServer implements the gRPC auth service

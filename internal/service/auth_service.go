@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/longvhv/saas-shared-go/errors"
-	"github.com/longvhv/saas-shared-go/jwt"
-	"github.com/longvhv/saas-shared-go/logger"
-	"github.com/longvhv/saas-shared-go/redis"
-	"github.com/longvhv/saas-shared-go/utils"
-	"github.com/vhvcorp/go-auth-service/internal/domain"
-	"github.com/vhvcorp/go-auth-service/internal/repository"
+	"github.com/vhvplatform/go-auth-service/internal/domain"
+	"github.com/vhvplatform/go-auth-service/internal/repository"
+	"github.com/vhvplatform/go-shared/errors"
+	"github.com/vhvplatform/go-shared/jwt"
+	"github.com/vhvplatform/go-shared/logger"
+	"github.com/vhvplatform/go-shared/redis"
+	"github.com/vhvplatform/go-shared/utils"
 	"go.uber.org/zap"
 )
 

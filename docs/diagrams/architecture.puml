@@ -119,7 +119,7 @@ component "Security" {
 }
 
 ' Shared Libraries
-component "Shared Libraries\n(vhvcorp/go-shared)" {
+component "Shared Libraries\n(vhvplatform/go-shared)" {
     [Config Loader]
     [Logger]
     [MongoDB Client]
@@ -220,7 +220,7 @@ note bottom of Redis
   - Cache: 5-15 minutes
 end note
 
-note right of "Shared Libraries\n(vhvcorp/go-shared)"
+note right of "Shared Libraries\n(vhvplatform/go-shared)"
   Shared Components:
   - Configuration management
   - Structured logging (zap)

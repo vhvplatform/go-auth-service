@@ -19,7 +19,7 @@ Please do not create a public GitHub issue for security vulnerabilities. This he
 
 ### 2. Report Privately
 
-Email security details to: **security@vhvcorp.com**
+Email security details to: **security@vhvplatform.com**
 
 Include the following information:
 - Type of vulnerability (e.g., SQL injection, XSS, authentication bypass)
@@ -221,7 +221,7 @@ This service is designed with the following compliance standards in mind:
 
 ## Known Security Issues
 
-Check our [Security Advisories](https://github.com/vhvcorp/go-auth-service/security/advisories) for current security issues and patches.
+Check our [Security Advisories](https://github.com/vhvplatform/go-auth-service/security/advisories) for current security issues and patches.
 
 ## Security Updates
 
@@ -243,8 +243,8 @@ See [go.mod](go.mod) for a complete list of dependencies.
 ## Contact
 
 For security concerns, please contact:
-- Email: security@vhvcorp.com
-- Security Advisory: [GitHub Security](https://github.com/vhvcorp/go-auth-service/security)
+- Email: security@vhvplatform.com
+- Security Advisory: [GitHub Security](https://github.com/vhvplatform/go-auth-service/security)
 
 ## Acknowledgments
 

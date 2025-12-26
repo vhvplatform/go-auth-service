@@ -772,10 +772,10 @@ netstat -tlnp | grep -E "8081|50051"
 
 ### Support Channels
 
-- **Documentation**: https://github.com/vhvcorp/go-auth-service/wiki
-- **Issues**: https://github.com/vhvcorp/go-auth-service/issues
-- **Discussions**: https://github.com/vhvcorp/go-auth-service/discussions
-- **Security**: security@vhvcorp.com
+- **Documentation**: https://github.com/vhvplatform/go-auth-service/wiki
+- **Issues**: https://github.com/vhvplatform/go-auth-service/issues
+- **Discussions**: https://github.com/vhvplatform/go-auth-service/discussions
+- **Security**: security@vhvplatform.com
 
 ### Creating a Bug Report
 

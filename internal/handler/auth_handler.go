@@ -4,10 +4,10 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/longvhv/saas-shared-go/errors"
-	"github.com/longvhv/saas-shared-go/logger"
-	"github.com/vhvcorp/go-auth-service/internal/domain"
-	"github.com/vhvcorp/go-auth-service/internal/service"
+	"github.com/vhvplatform/go-auth-service/internal/domain"
+	"github.com/vhvplatform/go-auth-service/internal/service"
+	"github.com/vhvplatform/go-shared/errors"
+	"github.com/vhvplatform/go-shared/logger"
 	"go.uber.org/zap"
 )
 
