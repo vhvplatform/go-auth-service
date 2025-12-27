@@ -43,12 +43,12 @@ func main() {
 
 	log.Info("Starting Auth Service", zap.String("environment", cfg.Environment))
 
-	// Initialize MongoDB
+	// Initialize MongoDB with optimized connection pool settings
 	mongoClient, err := mongodb.NewClient(context.Background(), mongodb.Config{
 		URI:         cfg.MongoDB.URI,
 		Database:    cfg.MongoDB.Database,
-		MaxPoolSize: cfg.MongoDB.MaxPoolSize,
-		MinPoolSize: cfg.MongoDB.MinPoolSize,
+		MaxPoolSize: getMaxPoolSize(cfg.MongoDB.MaxPoolSize, 100),  // Default to 100 if not set
+		MinPoolSize: getMinPoolSize(cfg.MongoDB.MinPoolSize, 10),   // Default to 10 if not set
 	})
 	if err != nil {
 		log.Fatal("Failed to connect to MongoDB", zap.Error(err))
@@ -142,9 +142,15 @@ func startHTTPServer(authService *service.AuthService, log *logger.Logger, port 
 		}
 	}
 
+	// Configure HTTP server with timeouts for better performance and resource management
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%s", port),
-		Handler: router,
+		Addr:              fmt.Sprintf(":%s", port),
+		Handler:           router,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		MaxHeaderBytes:    1 << 20, // 1 MB
 	}
 
 	// Start server in goroutine
@@ -170,4 +176,20 @@ func startHTTPServer(authService *service.AuthService, log *logger.Logger, port 
 	}
 
 	log.Info("Server exited")
+}
+
+// getMaxPoolSize returns the configured max pool size or default
+func getMaxPoolSize(configured uint64, defaultSize uint64) uint64 {
+	if configured > 0 {
+		return configured
+	}
+	return defaultSize
+}
+
+// getMinPoolSize returns the configured min pool size or default
+func getMinPoolSize(configured uint64, defaultSize uint64) uint64 {
+	if configured > 0 {
+		return configured
+	}
+	return defaultSize
 }

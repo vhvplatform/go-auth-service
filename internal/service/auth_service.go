@@ -94,18 +94,39 @@ func (s *AuthService) Login(ctx context.Context, req *domain.LoginRequest) (*dom
 	var user *domain.User
 	var err error
 
+	// Try to get user from cache first
+	cacheKey := fmt.Sprintf("user:%s:%s", req.Email, req.TenantID)
 	if req.TenantID != "" {
-		user, err = s.userRepo.FindByEmailAndTenant(ctx, req.Email, req.TenantID)
-	} else {
-		user, err = s.userRepo.FindByEmail(ctx, req.Email)
+		cachedData, cacheErr := s.redisClient.Get(ctx, cacheKey)
+		if cacheErr == nil && cachedData != "" {
+			var cachedUser domain.User
+			if json.Unmarshal([]byte(cachedData), &cachedUser) == nil {
+				user = &cachedUser
+			}
+		}
 	}
 
-	if err != nil {
-		s.logger.Error("Failed to find user", zap.Error(err))
-		return nil, errors.Internal("Failed to login")
-	}
+	// If not in cache, fetch from database
 	if user == nil {
-		return nil, errors.Unauthorized("Invalid email or password")
+		if req.TenantID != "" {
+			user, err = s.userRepo.FindByEmailAndTenant(ctx, req.Email, req.TenantID)
+		} else {
+			user, err = s.userRepo.FindByEmail(ctx, req.Email)
+		}
+
+		if err != nil {
+			s.logger.Error("Failed to find user", zap.Error(err))
+			return nil, errors.Internal("Failed to login")
+		}
+		if user == nil {
+			return nil, errors.Unauthorized("Invalid email or password")
+		}
+
+		// Cache user data for 5 minutes
+		if req.TenantID != "" {
+			userData, _ := json.Marshal(user)
+			_ = s.redisClient.Set(ctx, cacheKey, userData, 5*time.Minute)
+		}
 	}
 
 	// Check if user is active
@@ -118,10 +139,14 @@ func (s *AuthService) Login(ctx context.Context, req *domain.LoginRequest) (*dom
 		return nil, errors.Unauthorized("Invalid email or password")
 	}
 
-	// Update last login
-	if err := s.userRepo.UpdateLastLogin(ctx, user.ID.Hex()); err != nil {
-		s.logger.Warn("Failed to update last login", zap.Error(err))
-	}
+	// Update last login (asynchronously to avoid blocking)
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.userRepo.UpdateLastLogin(bgCtx, user.ID.Hex()); err != nil {
+			s.logger.Warn("Failed to update last login", zap.Error(err))
+		}
+	}()
 
 	s.logger.Info("User logged in successfully",
 		zap.String("user_id", user.ID.Hex()),
@@ -147,6 +172,15 @@ func (s *AuthService) Logout(ctx context.Context, userID, refreshToken string) e
 		s.logger.Error("Failed to delete session", zap.Error(err))
 	}
 
+	// Invalidate user cache using pattern matching
+	// Pattern: user_roles:userID:tenantID
+	userRolePattern := fmt.Sprintf("user_roles:%s:*", userID)
+	if keys := s.redisClient.GetClient().Keys(ctx, userRolePattern).Val(); len(keys) > 0 {
+		for _, key := range keys {
+			_ = s.redisClient.Delete(ctx, key)
+		}
+	}
+
 	s.logger.Info("User logged out", zap.String("user_id", userID))
 	return nil
 }
@@ -163,14 +197,31 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshTokenStr string) 
 		return nil, errors.Unauthorized("Invalid refresh token")
 	}
 
-	// Get user
-	user, err := s.userRepo.FindByID(ctx, token.UserID)
-	if err != nil {
-		s.logger.Error("Failed to find user", zap.Error(err))
-		return nil, errors.Internal("Failed to refresh token")
+	// Try to get user from cache first
+	cacheKey := fmt.Sprintf("user_by_id:%s", token.UserID)
+	cachedData, cacheErr := s.redisClient.Get(ctx, cacheKey)
+	var user *domain.User
+	if cacheErr == nil && cachedData != "" {
+		var cachedUser domain.User
+		if json.Unmarshal([]byte(cachedData), &cachedUser) == nil {
+			user = &cachedUser
+		}
 	}
+
+	// If not in cache, fetch from database
 	if user == nil {
-		return nil, errors.Unauthorized("User not found")
+		user, err = s.userRepo.FindByID(ctx, token.UserID)
+		if err != nil {
+			s.logger.Error("Failed to find user", zap.Error(err))
+			return nil, errors.Internal("Failed to refresh token")
+		}
+		if user == nil {
+			return nil, errors.Unauthorized("User not found")
+		}
+
+		// Cache user data for 5 minutes
+		userData, _ := json.Marshal(user)
+		_ = s.redisClient.Set(ctx, cacheKey, userData, 5*time.Minute)
 	}
 
 	// Generate new tokens
@@ -188,6 +239,19 @@ func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*jwt.
 
 // GetUserRoles gets roles and permissions for a user
 func (s *AuthService) GetUserRoles(ctx context.Context, userID, tenantID string) ([]string, []string, error) {
+	// Try to get from cache first
+	cacheKey := fmt.Sprintf("user_roles:%s:%s", userID, tenantID)
+	cachedData, err := s.redisClient.Get(ctx, cacheKey)
+	if err == nil && cachedData != "" {
+		var cached struct {
+			Roles       []string `json:"roles"`
+			Permissions []string `json:"permissions"`
+		}
+		if json.Unmarshal([]byte(cachedData), &cached) == nil {
+			return cached.Roles, cached.Permissions, nil
+		}
+	}
+
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, nil, err
@@ -199,6 +263,18 @@ func (s *AuthService) GetUserRoles(ctx context.Context, userID, tenantID string)
 	permissions, err := s.roleRepo.GetPermissionsForRoles(ctx, user.Roles, tenantID)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// Cache for 10 minutes
+	cacheData := struct {
+		Roles       []string `json:"roles"`
+		Permissions []string `json:"permissions"`
+	}{
+		Roles:       user.Roles,
+		Permissions: permissions,
+	}
+	if data, err := json.Marshal(cacheData); err == nil {
+		_ = s.redisClient.Set(ctx, cacheKey, data, 10*time.Minute)
 	}
 
 	return user.Roles, permissions, nil

@@ -64,7 +64,20 @@ func (r *UserRepository) Create(ctx context.Context, user *domain.User) error {
 // FindByEmail finds a user by email
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
 	var user domain.User
-	err := r.collection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
+	// Use projection to optimize query performance
+	opts := options.FindOne().SetProjection(bson.M{
+		"_id":           1,
+		"email":         1,
+		"password_hash": 1,
+		"tenant_id":     1,
+		"roles":         1,
+		"is_active":     1,
+		"is_verified":   1,
+		"last_login_at": 1,
+		"created_at":    1,
+		"updated_at":    1,
+	})
+	err := r.collection.FindOne(ctx, bson.M{"email": email}, opts).Decode(&user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
@@ -77,10 +90,23 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain
 // FindByEmailAndTenant finds a user by email and tenant
 func (r *UserRepository) FindByEmailAndTenant(ctx context.Context, email, tenantID string) (*domain.User, error) {
 	var user domain.User
+	// Use projection to fetch only needed fields for faster query
+	opts := options.FindOne().SetProjection(bson.M{
+		"_id":           1,
+		"email":         1,
+		"password_hash": 1,
+		"tenant_id":     1,
+		"roles":         1,
+		"is_active":     1,
+		"is_verified":   1,
+		"last_login_at": 1,
+		"created_at":    1,
+		"updated_at":    1,
+	})
 	err := r.collection.FindOne(ctx, bson.M{
 		"email":     email,
 		"tenant_id": tenantID,
-	}).Decode(&user)
+	}, opts).Decode(&user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
@@ -98,7 +124,20 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*domain.User,
 	}
 
 	var user domain.User
-	err = r.collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&user)
+	// Use projection for optimized query
+	opts := options.FindOne().SetProjection(bson.M{
+		"_id":           1,
+		"email":         1,
+		"password_hash": 1,
+		"tenant_id":     1,
+		"roles":         1,
+		"is_active":     1,
+		"is_verified":   1,
+		"last_login_at": 1,
+		"created_at":    1,
+		"updated_at":    1,
+	})
+	err = r.collection.FindOne(ctx, bson.M{"_id": objectID}, opts).Decode(&user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil

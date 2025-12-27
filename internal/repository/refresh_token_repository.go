@@ -60,11 +60,20 @@ func (r *RefreshTokenRepository) Create(ctx context.Context, token *domain.Refre
 // FindByToken finds a refresh token by token string
 func (r *RefreshTokenRepository) FindByToken(ctx context.Context, token string) (*domain.RefreshToken, error) {
 	var refreshToken domain.RefreshToken
+	// Optimize query with projection
+	opts := options.FindOne().SetProjection(bson.M{
+		"_id":        1,
+		"user_id":    1,
+		"token":      1,
+		"expires_at": 1,
+		"created_at": 1,
+		"revoked_at": 1,
+	})
 	err := r.collection.FindOne(ctx, bson.M{
 		"token":      token,
 		"revoked_at": nil,
 		"expires_at": bson.M{"$gt": time.Now()},
-	}).Decode(&refreshToken)
+	}, opts).Decode(&refreshToken)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
