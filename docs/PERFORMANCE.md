@@ -116,16 +116,20 @@ cacheKey := fmt.Sprintf("user_roles:%s:%s", userID, tenantID)
 
 Cache invalidation is implemented for:
 - **Logout**: Clears all user-related cache entries
-- **Pattern matching**: Uses Redis KEYS command to find and delete related cache entries
+- **SCAN pattern matching**: Uses Redis SCAN command (instead of KEYS) for better production performance
 
 ```go
 userRolePattern := fmt.Sprintf("user_roles:%s:*", userID)
-if keys := s.redisClient.GetClient().Keys(ctx, userRolePattern).Val(); len(keys) > 0 {
-    for _, key := range keys {
-        _ = s.redisClient.Delete(ctx, key)
-    }
+iter := s.redisClient.GetClient().Scan(ctx, 0, userRolePattern, 100).Iterator()
+for iter.Next(ctx) {
+    _ = s.redisClient.Delete(ctx, iter.Val())
 }
 ```
+
+**Why SCAN over KEYS**:
+- SCAN is non-blocking and doesn't affect Redis performance
+- KEYS command blocks the Redis server and can cause timeouts under load
+- SCAN iterates through keys in batches, maintaining responsiveness
 
 ## Server Configuration Optimizations
 
