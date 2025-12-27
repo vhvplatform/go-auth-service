@@ -124,8 +124,11 @@ func (s *AuthService) Login(ctx context.Context, req *domain.LoginRequest) (*dom
 
 		// Cache user data for 5 minutes
 		if req.TenantID != "" {
-			userData, _ := json.Marshal(user)
-			_ = s.redisClient.Set(ctx, cacheKey, userData, 5*time.Minute)
+			if userData, err := json.Marshal(user); err == nil {
+				_ = s.redisClient.Set(ctx, cacheKey, userData, 5*time.Minute)
+			} else {
+				s.logger.Warn("Failed to marshal user data for cache", zap.Error(err))
+			}
 		}
 	}
 
@@ -172,13 +175,15 @@ func (s *AuthService) Logout(ctx context.Context, userID, refreshToken string) e
 		s.logger.Error("Failed to delete session", zap.Error(err))
 	}
 
-	// Invalidate user cache using pattern matching
-	// Pattern: user_roles:userID:tenantID
+	// Invalidate user cache using SCAN for better performance in production
+	// Note: SCAN is preferred over KEYS as it doesn't block Redis
 	userRolePattern := fmt.Sprintf("user_roles:%s:*", userID)
-	if keys := s.redisClient.GetClient().Keys(ctx, userRolePattern).Val(); len(keys) > 0 {
-		for _, key := range keys {
-			_ = s.redisClient.Delete(ctx, key)
-		}
+	iter := s.redisClient.GetClient().Scan(ctx, 0, userRolePattern, 100).Iterator()
+	for iter.Next(ctx) {
+		_ = s.redisClient.Delete(ctx, iter.Val())
+	}
+	if err := iter.Err(); err != nil {
+		s.logger.Warn("Failed to scan and delete user role cache", zap.Error(err))
 	}
 
 	s.logger.Info("User logged out", zap.String("user_id", userID))
@@ -220,8 +225,11 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshTokenStr string) 
 		}
 
 		// Cache user data for 5 minutes
-		userData, _ := json.Marshal(user)
-		_ = s.redisClient.Set(ctx, cacheKey, userData, 5*time.Minute)
+		if userData, err := json.Marshal(user); err == nil {
+			_ = s.redisClient.Set(ctx, cacheKey, userData, 5*time.Minute)
+		} else {
+			s.logger.Warn("Failed to marshal user data for cache", zap.Error(err))
+		}
 	}
 
 	// Generate new tokens
@@ -275,6 +283,8 @@ func (s *AuthService) GetUserRoles(ctx context.Context, userID, tenantID string)
 	}
 	if data, err := json.Marshal(cacheData); err == nil {
 		_ = s.redisClient.Set(ctx, cacheKey, data, 10*time.Minute)
+	} else {
+		s.logger.Warn("Failed to marshal roles/permissions for cache", zap.Error(err))
 	}
 
 	return user.Roles, permissions, nil
@@ -336,7 +346,12 @@ func (s *AuthService) generateTokens(ctx context.Context, user *domain.User) (*d
 			CreatedAt: time.Now(),
 			ExpiresAt: time.Now().Add(1 * time.Hour),
 		}
-		sessionData, _ := json.Marshal(session)
+		sessionData, err := json.Marshal(session)
+		if err != nil {
+			s.logger.Error("Failed to marshal session data", zap.Error(err))
+			done <- true
+			return
+		}
 		sessionKey := fmt.Sprintf("session:%s", userID)
 		if err := s.redisClient.Set(ctx, sessionKey, sessionData, 1*time.Hour); err != nil {
 			s.logger.Warn("Failed to store session in Redis", zap.Error(err))
