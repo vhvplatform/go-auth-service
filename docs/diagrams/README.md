@@ -13,7 +13,36 @@ You can view these diagrams in several ways:
 
 ## Diagram Index
 
-### 1. Authentication Flow (`authentication-flow.puml`)
+### 1. Database ER Diagram (`database-er-diagram.puml`)
+**Purpose**: Visual representation of the database schema and entity relationships
+
+**Covers**:
+- All database collections/tables (users_auth, refresh_tokens, roles, permissions, oauth_accounts)
+- Entity attributes with data types
+- Primary keys, foreign keys, and unique constraints
+- Relationships with cardinality (1:1, 1:N, N:M)
+- Indexes for performance optimization
+- Multi-tenancy design patterns
+- Data flow between entities
+
+**Key Features**:
+- Complete field definitions with required/optional markers
+- Index specifications (UNIQUE, TTL)
+- Relationship annotations with cardinality
+- Security considerations per entity
+- Multi-tenant isolation design
+- Common query patterns
+
+**Collections Documented**:
+1. **users_auth**: User authentication data
+2. **refresh_tokens**: JWT refresh token management
+3. **roles**: RBAC role definitions
+4. **permissions**: Permission catalog
+5. **oauth_accounts**: OAuth provider linking
+
+---
+
+### 2. Authentication Flow (`authentication-flow.puml`)
 **Purpose**: Documents the complete user authentication lifecycle
 
 **Covers**:
@@ -34,7 +63,7 @@ You can view these diagrams in several ways:
 
 ---
 
-### 2. JWT Token Flow (`jwt-token-flow.puml`)
+### 3. JWT Token Flow (`jwt-token-flow.puml`)
 **Purpose**: Details JWT token generation, validation, and refresh mechanisms
 
 **Covers**:
@@ -57,7 +86,7 @@ You can view these diagrams in several ways:
 
 ---
 
-### 3. OAuth2 Flow (`oauth2-flow.puml`)
+### 4. OAuth2 Flow (`oauth2-flow.puml`)
 **Purpose**: Demonstrates OAuth2 integration for social login
 
 **Covers**:
@@ -80,7 +109,7 @@ You can view these diagrams in several ways:
 
 ---
 
-### 4. MFA Flow (`mfa-flow.puml`)
+### 5. MFA Flow (`mfa-flow.puml`)
 **Purpose**: Shows Multi-Factor Authentication setup and usage
 
 **Covers**:
@@ -104,7 +133,7 @@ You can view these diagrams in several ways:
 
 ---
 
-### 5. Password Reset Flow (`password-reset-flow.puml`)
+### 6. Password Reset Flow (`password-reset-flow.puml`)
 **Purpose**: Details the forgot password and reset process
 
 **Covers**:
@@ -130,7 +159,7 @@ You can view these diagrams in several ways:
 
 ---
 
-### 6. Session Management (`session-management.puml`)
+### 7. Session Management (`session-management.puml`)
 **Purpose**: Explains session lifecycle management
 
 **Covers**:
@@ -155,7 +184,7 @@ You can view these diagrams in several ways:
 
 ---
 
-### 7. Architecture Diagram (`architecture.puml`)
+### 8. Architecture Diagram (`architecture.puml`)
 **Purpose**: Overview of the entire authentication service architecture
 
 **Covers**:

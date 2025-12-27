@@ -101,3 +101,36 @@ func (r *RefreshTokenRepository) RevokeAllForUser(ctx context.Context, userID st
 	}
 	return nil
 }
+
+// DeleteExpiredTokens removes all expired and revoked tokens (for manual cleanup)
+func (r *RefreshTokenRepository) DeleteExpiredTokens(ctx context.Context) (int64, error) {
+	result, err := r.collection.DeleteMany(
+		ctx,
+		bson.M{
+			"$or": []bson.M{
+				{"expires_at": bson.M{"$lt": time.Now()}},
+				{"revoked_at": bson.M{"$ne": nil}},
+			},
+		},
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete expired tokens: %w", err)
+	}
+	return result.DeletedCount, nil
+}
+
+// CountActiveTokensForUser returns the number of active tokens for a user
+func (r *RefreshTokenRepository) CountActiveTokensForUser(ctx context.Context, userID string) (int64, error) {
+	count, err := r.collection.CountDocuments(
+		ctx,
+		bson.M{
+			"user_id":    userID,
+			"revoked_at": nil,
+			"expires_at": bson.M{"$gt": time.Now()},
+		},
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count active tokens: %w", err)
+	}
+	return count, nil
+}

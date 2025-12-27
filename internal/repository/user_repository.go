@@ -141,3 +141,38 @@ func (r *UserRepository) UpdateLastLogin(ctx context.Context, userID string) err
 	}
 	return nil
 }
+
+// CountByTenant returns the number of users in a tenant
+func (r *UserRepository) CountByTenant(ctx context.Context, tenantID string) (int64, error) {
+	count, err := r.collection.CountDocuments(ctx, bson.M{"tenant_id": tenantID})
+	if err != nil {
+		return 0, fmt.Errorf("failed to count users: %w", err)
+	}
+	return count, nil
+}
+
+// FindActiveByTenant finds active users in a tenant
+func (r *UserRepository) FindActiveByTenant(ctx context.Context, tenantID string, limit, skip int64) ([]*domain.User, error) {
+	filter := bson.M{
+		"tenant_id": tenantID,
+		"is_active": true,
+	}
+
+	opts := options.Find().
+		SetLimit(limit).
+		SetSkip(skip).
+		SetSort(bson.D{{Key: "created_at", Value: -1}})
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find active users: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	var users []*domain.User
+	if err := cursor.All(ctx, &users); err != nil {
+		return nil, fmt.Errorf("failed to decode users: %w", err)
+	}
+
+	return users, nil
+}
