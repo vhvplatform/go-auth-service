@@ -7,6 +7,7 @@ import (
 
 	"github.com/vhvplatform/go-auth-service/internal/domain"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -83,4 +84,36 @@ func (r *RoleRepository) GetPermissionsForRoles(ctx context.Context, roles []str
 	}
 
 	return permissions, nil
+}
+
+// Create creates a new role
+func (r *RoleRepository) Create(ctx context.Context, role *domain.Role) error {
+	role.CreatedAt = time.Now()
+	role.UpdatedAt = time.Now()
+
+	result, err := r.collection.InsertOne(ctx, role)
+	if err != nil {
+		return fmt.Errorf("failed to create role: %w", err)
+	}
+
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		role.ID = oid
+	}
+	return nil
+}
+
+// FindByNameAndTenant finds a role by name and tenant
+func (r *RoleRepository) FindByNameAndTenant(ctx context.Context, name, tenantID string) (*domain.Role, error) {
+	var role domain.Role
+	err := r.collection.FindOne(ctx, bson.M{
+		"name":      name,
+		"tenant_id": tenantID,
+	}).Decode(&role)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to find role: %w", err)
+	}
+	return &role, nil
 }
