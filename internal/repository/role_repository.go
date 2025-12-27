@@ -50,7 +50,10 @@ func (r *RoleRepository) FindByNames(ctx context.Context, names []string, tenant
 		},
 	}
 
-	cursor, err := r.collection.Find(ctx, filter)
+	// Use hint to leverage the compound index for better performance
+	opts := options.Find().SetHint(bson.D{{Key: "name", Value: 1}, {Key: "tenant_id", Value: 1}})
+
+	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find roles: %w", err)
 	}

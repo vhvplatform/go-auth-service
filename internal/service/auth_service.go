@@ -94,18 +94,42 @@ func (s *AuthService) Login(ctx context.Context, req *domain.LoginRequest) (*dom
 	var user *domain.User
 	var err error
 
+	// Try to get user from cache first
+	cacheKey := fmt.Sprintf("user:%s:%s", req.Email, req.TenantID)
 	if req.TenantID != "" {
-		user, err = s.userRepo.FindByEmailAndTenant(ctx, req.Email, req.TenantID)
-	} else {
-		user, err = s.userRepo.FindByEmail(ctx, req.Email)
+		cachedData, cacheErr := s.redisClient.Get(ctx, cacheKey)
+		if cacheErr == nil && cachedData != "" {
+			var cachedUser domain.User
+			if json.Unmarshal([]byte(cachedData), &cachedUser) == nil {
+				user = &cachedUser
+			}
+		}
 	}
 
-	if err != nil {
-		s.logger.Error("Failed to find user", zap.Error(err))
-		return nil, errors.Internal("Failed to login")
-	}
+	// If not in cache, fetch from database
 	if user == nil {
-		return nil, errors.Unauthorized("Invalid email or password")
+		if req.TenantID != "" {
+			user, err = s.userRepo.FindByEmailAndTenant(ctx, req.Email, req.TenantID)
+		} else {
+			user, err = s.userRepo.FindByEmail(ctx, req.Email)
+		}
+
+		if err != nil {
+			s.logger.Error("Failed to find user", zap.Error(err))
+			return nil, errors.Internal("Failed to login")
+		}
+		if user == nil {
+			return nil, errors.Unauthorized("Invalid email or password")
+		}
+
+		// Cache user data for 5 minutes
+		if req.TenantID != "" {
+			if userData, err := json.Marshal(user); err == nil {
+				_ = s.redisClient.Set(ctx, cacheKey, userData, 5*time.Minute)
+			} else {
+				s.logger.Warn("Failed to marshal user data for cache", zap.Error(err))
+			}
+		}
 	}
 
 	// Check if user is active
@@ -118,10 +142,14 @@ func (s *AuthService) Login(ctx context.Context, req *domain.LoginRequest) (*dom
 		return nil, errors.Unauthorized("Invalid email or password")
 	}
 
-	// Update last login
-	if err := s.userRepo.UpdateLastLogin(ctx, user.ID.Hex()); err != nil {
-		s.logger.Warn("Failed to update last login", zap.Error(err))
-	}
+	// Update last login (asynchronously to avoid blocking)
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.userRepo.UpdateLastLogin(bgCtx, user.ID.Hex()); err != nil {
+			s.logger.Warn("Failed to update last login", zap.Error(err))
+		}
+	}()
 
 	s.logger.Info("User logged in successfully",
 		zap.String("user_id", user.ID.Hex()),
@@ -147,6 +175,17 @@ func (s *AuthService) Logout(ctx context.Context, userID, refreshToken string) e
 		s.logger.Error("Failed to delete session", zap.Error(err))
 	}
 
+	// Invalidate user cache using SCAN for better performance in production
+	// Note: SCAN is preferred over KEYS as it doesn't block Redis
+	userRolePattern := fmt.Sprintf("user_roles:%s:*", userID)
+	iter := s.redisClient.GetClient().Scan(ctx, 0, userRolePattern, 100).Iterator()
+	for iter.Next(ctx) {
+		_ = s.redisClient.Delete(ctx, iter.Val())
+	}
+	if err := iter.Err(); err != nil {
+		s.logger.Warn("Failed to scan and delete user role cache", zap.Error(err))
+	}
+
 	s.logger.Info("User logged out", zap.String("user_id", userID))
 	return nil
 }
@@ -163,14 +202,34 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshTokenStr string) 
 		return nil, errors.Unauthorized("Invalid refresh token")
 	}
 
-	// Get user
-	user, err := s.userRepo.FindByID(ctx, token.UserID)
-	if err != nil {
-		s.logger.Error("Failed to find user", zap.Error(err))
-		return nil, errors.Internal("Failed to refresh token")
+	// Try to get user from cache first
+	cacheKey := fmt.Sprintf("user_by_id:%s", token.UserID)
+	cachedData, cacheErr := s.redisClient.Get(ctx, cacheKey)
+	var user *domain.User
+	if cacheErr == nil && cachedData != "" {
+		var cachedUser domain.User
+		if json.Unmarshal([]byte(cachedData), &cachedUser) == nil {
+			user = &cachedUser
+		}
 	}
+
+	// If not in cache, fetch from database
 	if user == nil {
-		return nil, errors.Unauthorized("User not found")
+		user, err = s.userRepo.FindByID(ctx, token.UserID)
+		if err != nil {
+			s.logger.Error("Failed to find user", zap.Error(err))
+			return nil, errors.Internal("Failed to refresh token")
+		}
+		if user == nil {
+			return nil, errors.Unauthorized("User not found")
+		}
+
+		// Cache user data for 5 minutes
+		if userData, err := json.Marshal(user); err == nil {
+			_ = s.redisClient.Set(ctx, cacheKey, userData, 5*time.Minute)
+		} else {
+			s.logger.Warn("Failed to marshal user data for cache", zap.Error(err))
+		}
 	}
 
 	// Generate new tokens
@@ -188,6 +247,19 @@ func (s *AuthService) ValidateToken(ctx context.Context, tokenStr string) (*jwt.
 
 // GetUserRoles gets roles and permissions for a user
 func (s *AuthService) GetUserRoles(ctx context.Context, userID, tenantID string) ([]string, []string, error) {
+	// Try to get from cache first
+	cacheKey := fmt.Sprintf("user_roles:%s:%s", userID, tenantID)
+	cachedData, err := s.redisClient.Get(ctx, cacheKey)
+	if err == nil && cachedData != "" {
+		var cached struct {
+			Roles       []string `json:"roles"`
+			Permissions []string `json:"permissions"`
+		}
+		if json.Unmarshal([]byte(cachedData), &cached) == nil {
+			return cached.Roles, cached.Permissions, nil
+		}
+	}
+
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, nil, err
@@ -199,6 +271,20 @@ func (s *AuthService) GetUserRoles(ctx context.Context, userID, tenantID string)
 	permissions, err := s.roleRepo.GetPermissionsForRoles(ctx, user.Roles, tenantID)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// Cache for 10 minutes
+	cacheData := struct {
+		Roles       []string `json:"roles"`
+		Permissions []string `json:"permissions"`
+	}{
+		Roles:       user.Roles,
+		Permissions: permissions,
+	}
+	if data, err := json.Marshal(cacheData); err == nil {
+		_ = s.redisClient.Set(ctx, cacheKey, data, 10*time.Minute)
+	} else {
+		s.logger.Warn("Failed to marshal roles/permissions for cache", zap.Error(err))
 	}
 
 	return user.Roles, permissions, nil
@@ -232,29 +318,54 @@ func (s *AuthService) generateTokens(ctx context.Context, user *domain.User) (*d
 		return nil, errors.Internal("Failed to generate tokens")
 	}
 
-	// Store refresh token in database
-	refreshTokenDoc := &domain.RefreshToken{
-		UserID:    userID,
-		Token:     refreshToken,
-		ExpiresAt: time.Now().Add(7 * 24 * time.Hour), // 7 days
-	}
-	if err := s.refreshTokenRepo.Create(ctx, refreshTokenDoc); err != nil {
-		s.logger.Error("Failed to store refresh token", zap.Error(err))
-	}
+	// Store refresh token and session concurrently for better performance
+	var refreshTokenErr error
+	done := make(chan bool, 2)
 
-	// Store session in Redis
-	session := &domain.Session{
-		UserID:    userID,
-		TenantID:  user.TenantID,
-		Email:     user.Email,
-		Roles:     user.Roles,
-		CreatedAt: time.Now(),
-		ExpiresAt: time.Now().Add(1 * time.Hour),
-	}
-	sessionData, _ := json.Marshal(session)
-	sessionKey := fmt.Sprintf("session:%s", userID)
-	if err := s.redisClient.Set(ctx, sessionKey, sessionData, 1*time.Hour); err != nil {
-		s.logger.Warn("Failed to store session in Redis", zap.Error(err))
+	// Store refresh token in database (async)
+	go func() {
+		refreshTokenDoc := &domain.RefreshToken{
+			UserID:    userID,
+			Token:     refreshToken,
+			ExpiresAt: time.Now().Add(7 * 24 * time.Hour), // 7 days
+		}
+		if err := s.refreshTokenRepo.Create(ctx, refreshTokenDoc); err != nil {
+			s.logger.Error("Failed to store refresh token", zap.Error(err))
+			refreshTokenErr = err
+		}
+		done <- true
+	}()
+
+	// Store session in Redis (async)
+	go func() {
+		session := &domain.Session{
+			UserID:    userID,
+			TenantID:  user.TenantID,
+			Email:     user.Email,
+			Roles:     user.Roles,
+			CreatedAt: time.Now(),
+			ExpiresAt: time.Now().Add(1 * time.Hour),
+		}
+		sessionData, err := json.Marshal(session)
+		if err != nil {
+			s.logger.Error("Failed to marshal session data", zap.Error(err))
+			done <- true
+			return
+		}
+		sessionKey := fmt.Sprintf("session:%s", userID)
+		if err := s.redisClient.Set(ctx, sessionKey, sessionData, 1*time.Hour); err != nil {
+			s.logger.Warn("Failed to store session in Redis", zap.Error(err))
+		}
+		done <- true
+	}()
+
+	// Wait for both operations to complete
+	<-done
+	<-done
+
+	// Check for critical errors (refresh token storage)
+	if refreshTokenErr != nil {
+		return nil, errors.Internal("Failed to store refresh token")
 	}
 
 	return &domain.LoginResponse{
