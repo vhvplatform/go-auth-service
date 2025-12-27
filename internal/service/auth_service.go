@@ -308,29 +308,49 @@ func (s *AuthService) generateTokens(ctx context.Context, user *domain.User) (*d
 		return nil, errors.Internal("Failed to generate tokens")
 	}
 
-	// Store refresh token in database
-	refreshTokenDoc := &domain.RefreshToken{
-		UserID:    userID,
-		Token:     refreshToken,
-		ExpiresAt: time.Now().Add(7 * 24 * time.Hour), // 7 days
-	}
-	if err := s.refreshTokenRepo.Create(ctx, refreshTokenDoc); err != nil {
-		s.logger.Error("Failed to store refresh token", zap.Error(err))
-	}
+	// Store refresh token and session concurrently for better performance
+	var refreshTokenErr error
+	done := make(chan bool, 2)
 
-	// Store session in Redis
-	session := &domain.Session{
-		UserID:    userID,
-		TenantID:  user.TenantID,
-		Email:     user.Email,
-		Roles:     user.Roles,
-		CreatedAt: time.Now(),
-		ExpiresAt: time.Now().Add(1 * time.Hour),
-	}
-	sessionData, _ := json.Marshal(session)
-	sessionKey := fmt.Sprintf("session:%s", userID)
-	if err := s.redisClient.Set(ctx, sessionKey, sessionData, 1*time.Hour); err != nil {
-		s.logger.Warn("Failed to store session in Redis", zap.Error(err))
+	// Store refresh token in database (async)
+	go func() {
+		refreshTokenDoc := &domain.RefreshToken{
+			UserID:    userID,
+			Token:     refreshToken,
+			ExpiresAt: time.Now().Add(7 * 24 * time.Hour), // 7 days
+		}
+		if err := s.refreshTokenRepo.Create(ctx, refreshTokenDoc); err != nil {
+			s.logger.Error("Failed to store refresh token", zap.Error(err))
+			refreshTokenErr = err
+		}
+		done <- true
+	}()
+
+	// Store session in Redis (async)
+	go func() {
+		session := &domain.Session{
+			UserID:    userID,
+			TenantID:  user.TenantID,
+			Email:     user.Email,
+			Roles:     user.Roles,
+			CreatedAt: time.Now(),
+			ExpiresAt: time.Now().Add(1 * time.Hour),
+		}
+		sessionData, _ := json.Marshal(session)
+		sessionKey := fmt.Sprintf("session:%s", userID)
+		if err := s.redisClient.Set(ctx, sessionKey, sessionData, 1*time.Hour); err != nil {
+			s.logger.Warn("Failed to store session in Redis", zap.Error(err))
+		}
+		done <- true
+	}()
+
+	// Wait for both operations to complete
+	<-done
+	<-done
+
+	// Check for critical errors (refresh token storage)
+	if refreshTokenErr != nil {
+		return nil, errors.Internal("Failed to store refresh token")
 	}
 
 	return &domain.LoginResponse{
