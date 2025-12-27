@@ -47,8 +47,8 @@ func main() {
 	mongoClient, err := mongodb.NewClient(context.Background(), mongodb.Config{
 		URI:         cfg.MongoDB.URI,
 		Database:    cfg.MongoDB.Database,
-		MaxPoolSize: getMaxPoolSize(cfg.MongoDB.MaxPoolSize, 100),  // Default to 100 if not set
-		MinPoolSize: getMinPoolSize(cfg.MongoDB.MinPoolSize, 10),   // Default to 10 if not set
+		MaxPoolSize: getMaxPoolSize(cfg.MongoDB.MaxPoolSize, 100), // Default to 100 if not set
+		MinPoolSize: getMinPoolSize(cfg.MongoDB.MinPoolSize, 10),  // Default to 10 if not set
 	})
 	if err != nil {
 		log.Fatal("Failed to connect to MongoDB", zap.Error(err))
