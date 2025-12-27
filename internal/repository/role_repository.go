@@ -96,7 +96,9 @@ func (r *RoleRepository) Create(ctx context.Context, role *domain.Role) error {
 		return fmt.Errorf("failed to create role: %w", err)
 	}
 
-	role.ID = result.InsertedID.(primitive.ObjectID)
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		role.ID = oid
+	}
 	return nil
 }
 
