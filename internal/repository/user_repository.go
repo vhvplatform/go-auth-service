@@ -31,12 +31,12 @@ func NewUserRepository(db *mongo.Database) *UserRepository {
 			Options: options.Index().SetUnique(true),
 		},
 		{
-			Keys: bson.D{{Key: "tenant_id", Value: 1}},
+			Keys: bson.D{{Key: "tenantId", Value: 1}},
 		},
 		{
 			Keys: bson.D{
 				{Key: "email", Value: 1},
-				{Key: "tenant_id", Value: 1},
+				{Key: "tenantId", Value: 1},
 			},
 			Options: options.Index().SetUnique(true),
 		},
@@ -66,16 +66,16 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain
 	var user domain.User
 	// Use projection to optimize query performance
 	opts := options.FindOne().SetProjection(bson.M{
-		"_id":           1,
-		"email":         1,
-		"password_hash": 1,
-		"tenant_id":     1,
-		"roles":         1,
-		"is_active":     1,
-		"is_verified":   1,
-		"last_login_at": 1,
-		"created_at":    1,
-		"updated_at":    1,
+		"_id":          1,
+		"email":        1,
+		"passwordHash": 1,
+		"tenantId":     1,
+		"roles":        1,
+		"isActive":     1,
+		"isVerified":   1,
+		"lastLoginAt":  1,
+		"createdAt":    1,
+		"updatedAt":    1,
 	})
 	err := r.collection.FindOne(ctx, bson.M{"email": email}, opts).Decode(&user)
 	if err != nil {
@@ -92,20 +92,20 @@ func (r *UserRepository) FindByEmailAndTenant(ctx context.Context, email, tenant
 	var user domain.User
 	// Use projection to fetch only needed fields for faster query
 	opts := options.FindOne().SetProjection(bson.M{
-		"_id":           1,
-		"email":         1,
-		"password_hash": 1,
-		"tenant_id":     1,
-		"roles":         1,
-		"is_active":     1,
-		"is_verified":   1,
-		"last_login_at": 1,
-		"created_at":    1,
-		"updated_at":    1,
+		"_id":          1,
+		"email":        1,
+		"passwordHash": 1,
+		"tenantId":     1,
+		"roles":        1,
+		"isActive":     1,
+		"isVerified":   1,
+		"lastLoginAt":  1,
+		"createdAt":    1,
+		"updatedAt":    1,
 	})
 	err := r.collection.FindOne(ctx, bson.M{
-		"email":     email,
-		"tenant_id": tenantID,
+		"email":    email,
+		"tenantId": tenantID,
 	}, opts).Decode(&user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -126,16 +126,16 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*domain.User,
 	var user domain.User
 	// Use projection for optimized query
 	opts := options.FindOne().SetProjection(bson.M{
-		"_id":           1,
-		"email":         1,
-		"password_hash": 1,
-		"tenant_id":     1,
-		"roles":         1,
-		"is_active":     1,
-		"is_verified":   1,
-		"last_login_at": 1,
-		"created_at":    1,
-		"updated_at":    1,
+		"_id":          1,
+		"email":        1,
+		"passwordHash": 1,
+		"tenantId":     1,
+		"roles":        1,
+		"isActive":     1,
+		"isVerified":   1,
+		"lastLoginAt":  1,
+		"createdAt":    1,
+		"updatedAt":    1,
 	})
 	err = r.collection.FindOne(ctx, bson.M{"_id": objectID}, opts).Decode(&user)
 	if err != nil {
@@ -173,7 +173,7 @@ func (r *UserRepository) UpdateLastLogin(ctx context.Context, userID string) err
 	_, err = r.collection.UpdateOne(
 		ctx,
 		bson.M{"_id": objectID},
-		bson.M{"$set": bson.M{"last_login_at": now}},
+		bson.M{"$set": bson.M{"lastLoginAt": now}},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update last login: %w", err)
@@ -183,7 +183,7 @@ func (r *UserRepository) UpdateLastLogin(ctx context.Context, userID string) err
 
 // CountByTenant returns the number of users in a tenant
 func (r *UserRepository) CountByTenant(ctx context.Context, tenantID string) (int64, error) {
-	count, err := r.collection.CountDocuments(ctx, bson.M{"tenant_id": tenantID})
+	count, err := r.collection.CountDocuments(ctx, bson.M{"tenantId": tenantID})
 	if err != nil {
 		return 0, fmt.Errorf("failed to count users: %w", err)
 	}
@@ -193,14 +193,14 @@ func (r *UserRepository) CountByTenant(ctx context.Context, tenantID string) (in
 // FindActiveByTenant finds active users in a tenant
 func (r *UserRepository) FindActiveByTenant(ctx context.Context, tenantID string, limit, skip int64) ([]*domain.User, error) {
 	filter := bson.M{
-		"tenant_id": tenantID,
-		"is_active": true,
+		"tenantId": tenantID,
+		"isActive": true,
 	}
 
 	opts := options.Find().
 		SetLimit(limit).
 		SetSkip(skip).
-		SetSort(bson.D{{Key: "created_at", Value: -1}})
+		SetSort(bson.D{{Key: "createdAt", Value: -1}})
 
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {

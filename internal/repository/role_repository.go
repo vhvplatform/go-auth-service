@@ -29,7 +29,7 @@ func NewRoleRepository(db *mongo.Database) *RoleRepository {
 		{
 			Keys: bson.D{
 				{Key: "name", Value: 1},
-				{Key: "tenant_id", Value: 1},
+				{Key: "tenantId", Value: 1},
 			},
 			Options: options.Index().SetUnique(true),
 		},
@@ -45,13 +45,13 @@ func (r *RoleRepository) FindByNames(ctx context.Context, names []string, tenant
 	filter := bson.M{
 		"name": bson.M{"$in": names},
 		"$or": []bson.M{
-			{"tenant_id": tenantID},
-			{"tenant_id": bson.M{"$exists": false}},
+			{"tenantId": tenantID},
+			{"tenantId": bson.M{"$exists": false}},
 		},
 	}
 
 	// Use hint to leverage the compound index for better performance
-	opts := options.Find().SetHint(bson.D{{Key: "name", Value: 1}, {Key: "tenant_id", Value: 1}})
+	opts := options.Find().SetHint(bson.D{{Key: "name", Value: 1}, {Key: "tenantId", Value: 1}})
 
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
@@ -109,8 +109,8 @@ func (r *RoleRepository) Create(ctx context.Context, role *domain.Role) error {
 func (r *RoleRepository) FindByNameAndTenant(ctx context.Context, name, tenantID string) (*domain.Role, error) {
 	var role domain.Role
 	err := r.collection.FindOne(ctx, bson.M{
-		"name":      name,
-		"tenant_id": tenantID,
+		"name":     name,
+		"tenantId": tenantID,
 	}).Decode(&role)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {

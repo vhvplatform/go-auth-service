@@ -27,14 +27,14 @@ func NewRefreshTokenRepository(db *mongo.Database) *RefreshTokenRepository {
 
 	indexes := []mongo.IndexModel{
 		{
-			Keys: bson.D{{Key: "user_id", Value: 1}},
+			Keys: bson.D{{Key: "userId", Value: 1}},
 		},
 		{
 			Keys:    bson.D{{Key: "token", Value: 1}},
 			Options: options.Index().SetUnique(true),
 		},
 		{
-			Keys:    bson.D{{Key: "expires_at", Value: 1}},
+			Keys:    bson.D{{Key: "expiresAt", Value: 1}},
 			Options: options.Index().SetExpireAfterSeconds(0),
 		},
 	}
@@ -62,17 +62,17 @@ func (r *RefreshTokenRepository) FindByToken(ctx context.Context, token string) 
 	var refreshToken domain.RefreshToken
 	// Optimize query with projection
 	opts := options.FindOne().SetProjection(bson.M{
-		"_id":        1,
-		"user_id":    1,
-		"token":      1,
-		"expires_at": 1,
-		"created_at": 1,
-		"revoked_at": 1,
+		"_id":       1,
+		"userId":    1,
+		"token":     1,
+		"expiresAt": 1,
+		"createdAt": 1,
+		"revokedAt": 1,
 	})
 	err := r.collection.FindOne(ctx, bson.M{
-		"token":      token,
-		"revoked_at": nil,
-		"expires_at": bson.M{"$gt": time.Now()},
+		"token":     token,
+		"revokedAt": nil,
+		"expiresAt": bson.M{"$gt": time.Now()},
 	}, opts).Decode(&refreshToken)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -89,7 +89,7 @@ func (r *RefreshTokenRepository) Revoke(ctx context.Context, token string) error
 	_, err := r.collection.UpdateOne(
 		ctx,
 		bson.M{"token": token},
-		bson.M{"$set": bson.M{"revoked_at": now}},
+		bson.M{"$set": bson.M{"revokedAt": now}},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to revoke refresh token: %w", err)
@@ -102,8 +102,8 @@ func (r *RefreshTokenRepository) RevokeAllForUser(ctx context.Context, userID st
 	now := time.Now()
 	_, err := r.collection.UpdateMany(
 		ctx,
-		bson.M{"user_id": userID, "revoked_at": nil},
-		bson.M{"$set": bson.M{"revoked_at": now}},
+		bson.M{"userId": userID, "revokedAt": nil},
+		bson.M{"$set": bson.M{"revokedAt": now}},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to revoke user tokens: %w", err)
@@ -117,8 +117,8 @@ func (r *RefreshTokenRepository) DeleteExpiredTokens(ctx context.Context) (int64
 		ctx,
 		bson.M{
 			"$or": []bson.M{
-				{"expires_at": bson.M{"$lt": time.Now()}},
-				{"revoked_at": bson.M{"$ne": nil}},
+				{"expiresAt": bson.M{"$lt": time.Now()}},
+				{"revokedAt": bson.M{"$ne": nil}},
 			},
 		},
 	)
@@ -133,9 +133,9 @@ func (r *RefreshTokenRepository) CountActiveTokensForUser(ctx context.Context, u
 	count, err := r.collection.CountDocuments(
 		ctx,
 		bson.M{
-			"user_id":    userID,
-			"revoked_at": nil,
-			"expires_at": bson.M{"$gt": time.Now()},
+			"userId":    userID,
+			"revokedAt": nil,
+			"expiresAt": bson.M{"$gt": time.Now()},
 		},
 	)
 	if err != nil {
