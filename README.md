@@ -38,7 +38,11 @@ A comprehensive authentication and authorization service built with Go, providin
 - Redis 6.0+ (if applicable)
 - RabbitMQ 3.9+ (if applicable)
 
+**Windows Users:** See [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for detailed Windows installation guide.
+
 ## Installation
+
+### Linux / macOS
 
 ```bash
 # Clone the repository
@@ -47,6 +51,23 @@ cd go-auth-service
 
 # Install dependencies
 go mod download
+```
+
+### Windows
+
+For Windows-specific installation instructions, see [WINDOWS_SETUP.md](WINDOWS_SETUP.md).
+
+**Quick Start (Windows):**
+```cmd
+# Clone the repository
+git clone https://github.com/vhvplatform/go-auth-service.git
+cd go-auth-service
+
+# Run setup script
+setup-windows.bat
+
+# Or using PowerShell
+.\setup-windows.ps1
 ```
 
 ## Configuration
@@ -63,9 +84,22 @@ See [DEPENDENCIES.md](docs/DEPENDENCIES.md) for a complete list of environment v
 
 ### Running Locally
 
+**Linux / macOS:**
 ```bash
 # Run the service
 make run
+
+# Or with go run
+go run cmd/main.go
+```
+
+**Windows:**
+```cmd
+# Using batch script
+run-dev.bat
+
+# Or using PowerShell
+.\run-dev.ps1
 
 # Or with go run
 go run cmd/main.go
@@ -81,12 +115,25 @@ make docker-run
 
 ### Running Tests
 
+**Linux / macOS:**
 ```bash
 # Run all tests
 make test
 
 # Run with coverage
 make test-coverage
+```
+
+**Windows:**
+```cmd
+# Using batch script
+test-windows.bat
+
+# Or using PowerShell
+.\test-windows.ps1
+
+# Or with go test
+go test ./...
 ```
 
 ### Linting
