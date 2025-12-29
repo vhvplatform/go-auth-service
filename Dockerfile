@@ -3,32 +3,28 @@ FROM golang:1.25.5-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
+# Cài đặt các công cụ cần thiết
 RUN apk add --no-cache git
 
-# Copy go modules
-COPY go.mod go.sum ./
+# 1. Copy go.mod và go.sum của cả SHARED và SERVICE để cache dependencies
+COPY go-shared/go.mod go-shared/go.sum ./go-shared/
+COPY go-auth-service/go.mod go-auth-service/go.sum ./go-auth-service/
 
-# Download dependencies
-RUN go mod download
+# 2. Download dependencies (Go sẽ tự xử lý mối quan hệ giữa các module)
+RUN cd go-auth-service && go mod download
 
-# Copy source code
-COPY . .
+# 3. Copy toàn bộ mã nguồn cần thiết
+COPY go-shared/ ./go-shared/
+COPY go-auth-service/ ./go-auth-service/
 
-# Build the application
+# 4. Build service
+WORKDIR /app/go-auth-service
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o /app/bin/auth-service ./cmd/main.go
 
 # Final stage
 FROM alpine:latest
-
 RUN apk --no-cache add ca-certificates tzdata
-
 WORKDIR /root/
-
-# Copy binary from builder
 COPY --from=builder /app/bin/auth-service .
-
-# Expose ports (gRPC: 50051, HTTP: 8081)
 EXPOSE 50051 8081
-
 CMD ["./auth-service"]
