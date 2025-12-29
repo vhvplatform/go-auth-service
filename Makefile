@@ -1,4 +1,4 @@
-.PHONY: help build test lint clean run docker-build docker-push proto
+.PHONY: help build test lint clean run docker-build docker-push proto build-windows build-linux test-windows
 
 # Variables
 auth-service := auth-service
@@ -6,17 +6,49 @@ DOCKER_REGISTRY ?= ghcr.io/vhvplatform
 VERSION ?= $(shell git describe --tags --always --dirty)
 GO_VERSION := 1.25
 
+# Detect OS for Windows-specific commands
+ifeq ($(OS),Windows_NT)
+    BINARY_EXT := .exe
+    RM := del /Q
+    RMDIR := rmdir /S /Q
+    MKDIR := mkdir
+    PATHSEP := \\
+else
+    BINARY_EXT :=
+    RM := rm -f
+    RMDIR := rm -rf
+    MKDIR := mkdir -p
+    PATHSEP := /
+endif
+
 help: ## Display this help screen
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-build: ## Build the service
+build: ## Build the service (platform-specific)
 	@echo "Building $(auth-service)..."
-	@go build -o bin/$(auth-service) ./cmd/main.go
+	@go build -o bin/$(auth-service)$(BINARY_EXT) ./cmd/main.go
 	@echo "Build complete!"
+
+build-windows: ## Build for Windows
+	@echo "Building $(auth-service) for Windows..."
+	@set CGO_ENABLED=0
+	@set GOOS=windows
+	@set GOARCH=amd64
+	@go build -ldflags="-s -w" -o bin/$(auth-service).exe ./cmd/main.go
+	@echo "Windows build complete: bin/$(auth-service).exe"
+
+build-linux: ## Build for Linux
+	@echo "Building $(auth-service) for Linux..."
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/$(auth-service) ./cmd/main.go
+	@echo "Linux build complete: bin/$(auth-service)"
 
 test: ## Run tests
 	@echo "Running tests..."
 	@go test -v -race ./...
+
+test-windows: ## Run Windows environment tests
+	@echo "Running Windows environment tests..."
+	@go test -v ./internal/tests
 
 test-coverage: ## Run tests with coverage
 	@echo "Running tests with coverage..."
@@ -39,7 +71,15 @@ vet: ## Run go vet
 
 clean: ## Clean build artifacts
 	@echo "Cleaning..."
+ifeq ($(OS),Windows_NT)
+	@if exist bin $(RMDIR) bin
+	@if exist dist $(RMDIR) dist
+	@if exist coverage.txt $(RM) coverage.txt
+	@if exist coverage.html $(RM) coverage.html
+	@if exist *.out $(RM) *.out
+else
 	@rm -rf bin/ dist/ coverage.* *.out
+endif
 	@go clean -testcache
 	@echo "Clean complete!"
 
