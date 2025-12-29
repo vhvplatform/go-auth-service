@@ -37,7 +37,7 @@ Write-Host ""
 
 # Run the application
 try {
-    go run cmd\main.go
+    go run cmd/main.go
 } catch {
     Write-Host ""
     Write-Host "[ERROR] Service failed to start" -ForegroundColor Red

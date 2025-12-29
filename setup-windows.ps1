@@ -95,7 +95,7 @@ if (-not (Test-Path bin)) {
 }
 
 try {
-    go build -o bin\auth-service.exe .\cmd\main.go
+    go build -o bin/auth-service.exe ./cmd/main.go
     if ($LASTEXITCODE -ne 0) { throw }
     Write-Host "[OK] Application built successfully: bin\auth-service.exe" -ForegroundColor Green
 } catch {
