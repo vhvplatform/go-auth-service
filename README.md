@@ -2,6 +2,8 @@
 
 > Authentication and Authorization Service - Part of the SaaS Framework
 
+**Windows Developers:** 🪟 See [WINDOWS_QUICKSTART.md](WINDOWS_QUICKSTART.md) for quick setup or [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for detailed guide.
+
 ## Description
 
 A comprehensive authentication and authorization service built with Go, providing secure user authentication, JWT token management, OAuth2 integration, and multi-factor authentication support. This service is designed for multi-tenant SaaS applications with enterprise-grade security features.
