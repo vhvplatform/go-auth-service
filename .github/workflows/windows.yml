@@ -10,10 +10,15 @@ on:
 env:
   GO_VERSION: '1.25'
 
+permissions:
+  contents: read
+
 jobs:
   test-windows:
     name: Test on Windows
     runs-on: windows-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
@@ -93,6 +98,8 @@ jobs:
     name: Build Windows Binary
     runs-on: windows-latest
     needs: test-windows
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
@@ -121,6 +128,8 @@ jobs:
   validate-scripts:
     name: Validate Windows Scripts
     runs-on: windows-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
@@ -165,6 +174,8 @@ jobs:
     name: Cross-compile from Windows
     runs-on: windows-latest
     needs: test-windows
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
