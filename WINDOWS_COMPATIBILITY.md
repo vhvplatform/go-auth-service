@@ -167,7 +167,21 @@ However, **Linux containers via Docker Desktop are recommended** for this servic
 
 ## CI/CD Considerations
 
-The project's CI/CD workflows use Linux runners, which is standard practice. However, Go's cross-compilation ensures that:
+The project includes both Linux and Windows CI/CD workflows:
+
+### Linux CI (Primary)
+- Runs on Ubuntu runners (standard practice)
+- Tests with MongoDB, Redis, and RabbitMQ services
+- Performs linting, security scans, and coverage checks
+
+### Windows CI (Compatibility)
+- Runs on Windows runners (`.github/workflows/windows.yml`)
+- Validates Windows-specific functionality
+- Tests PowerShell and batch scripts
+- Verifies cross-compilation from Windows
+- Builds Windows binaries as artifacts
+
+Go's cross-compilation ensures that:
 
 1. Code written on Windows works on Linux
 2. Code written on Linux works on Windows
