@@ -119,7 +119,7 @@ jobs:
         shell: powershell
 
       - name: Upload Windows binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: auth-service-windows-amd64
           path: bin/auth-service.exe
