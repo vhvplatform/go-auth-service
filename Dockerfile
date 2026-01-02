@@ -24,7 +24,10 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags="-w -s" -o 
 # Final stage
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates tzdata
-WORKDIR /root/
-COPY --from=builder /app/bin/auth-service .
+RUN addgroup -S appgroup && adduser -S appuser -u 1000 -G appgroup
+WORKDIR /app
+RUN chown 1000:1000 /app
+COPY --from=builder --chown=1000:1000 /app/bin/auth-service .
+USER 1000
 EXPOSE 50051 8081
 CMD ["./auth-service"]
