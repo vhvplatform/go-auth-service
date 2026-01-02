@@ -311,6 +311,16 @@ Protection against brute force and abuse:
 
 The service provides both gRPC and HTTP/REST APIs for maximum flexibility.
 
+### Swagger/OpenAPI Documentation
+
+Swagger UI is available when the service is running at:
+- **Swagger UI**: http://localhost:8081/swagger/index.html
+
+To regenerate Swagger documentation after making changes:
+```bash
+make swagger
+```
+
 ### Authentication Flows
 
 #### 1. User Registration Flow

@@ -11,6 +11,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	_ "github.com/vhvplatform/go-auth-service/docs"
 	"github.com/vhvplatform/go-auth-service/internal/grpc"
 	"github.com/vhvplatform/go-auth-service/internal/handler"
 	"github.com/vhvplatform/go-auth-service/internal/repository"
@@ -26,6 +29,26 @@ import (
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
+
+// @title Auth Service API
+// @version 1.0
+// @description Authentication & Authorization Service with JWT
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.url http://www.vhvplatform.com/support
+// @contact.email support@vhvplatform.com
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host localhost:8081
+// @BasePath /
+// @schemes http https
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 
 func main() {
 	// Load configuration
@@ -129,6 +152,9 @@ func startHTTPServer(authService *service.AuthService, log *logger.Logger, port 
 	router.GET("/ready", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ready"})
 	})
+
+	// Swagger endpoint
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// API routes
 	v1 := router.Group("/api/v1")

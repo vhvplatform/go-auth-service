@@ -121,10 +121,16 @@ docker-run: ## Run Docker container locally
 install-tools: ## Install development tools
 	@echo "Installing development tools..."
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@go install github.com/swaggo/swag/cmd/swag@latest
 	@if [ -d "proto" ]; then \
 		go install google.golang.org/protobuf/cmd/protoc-gen-go@latest; \
 		go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest; \
 	fi
 	@echo "Tools installed!"
+
+swagger: ## Generate Swagger documentation
+	@echo "Generating Swagger documentation..."
+	@swag init -g cmd/main.go -o docs --parseDependency --parseInternal
+	@echo "Swagger documentation generated at docs/"
 
 .DEFAULT_GOAL := help
