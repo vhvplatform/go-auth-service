@@ -2,7 +2,54 @@
 
 > Authentication and Authorization Service - Part of the SaaS Framework
 
-**Windows Developers:** 🪟 See [WINDOWS_QUICKSTART.md](WINDOWS_QUICKSTART.md) for quick setup or [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for detailed guide.
+**Windows Developers:** 🪟 See [docs/WINDOWS_QUICKSTART.md](docs/WINDOWS_QUICKSTART.md) for quick setup or [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md) for detailed guide.
+
+## 🏗️ Repository Structure
+
+This repository is organized as a monorepo containing multiple microservices:
+
+```
+.
+├── server/          # Golang backend microservice
+├── client/          # ReactJS frontend microservice
+├── flutter/         # Flutter mobile application
+└── docs/            # Project documentation
+```
+
+### 📁 Directory Overview
+
+- **`server/`** - Golang authentication backend service (gRPC + REST API)
+  - Complete authentication and authorization service
+  - See [server/README.md](server/README.md) for details
+  
+- **`client/`** - ReactJS frontend application
+  - Web UI for authentication
+  - See [client/README.md](client/README.md) for details
+  
+- **`flutter/`** - Flutter mobile application
+  - Cross-platform mobile app (iOS/Android)
+  - See [flutter/README.md](flutter/README.md) for details
+  
+- **`docs/`** - Centralized documentation
+  - Architecture, API docs, deployment guides
+  - Windows-specific documentation
+
+## 📖 Documentation
+
+All documentation is centralized in the `docs/` directory:
+
+- **[DEPENDENCIES.md](docs/DEPENDENCIES.md)** - Service dependencies and environment variables
+- **[DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md)** - Database schema and design
+- **[OAUTH2_INTEGRATION.md](docs/OAUTH2_INTEGRATION.md)** - OAuth2 provider integration
+- **[PERFORMANCE.md](docs/PERFORMANCE.md)** - Performance optimization guide
+- **[SECURITY_HARDENING.md](docs/SECURITY_HARDENING.md)** - Security best practices
+- **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+
+### Windows Documentation
+- **[WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md)** - Windows installation guide
+- **[WINDOWS_QUICKSTART.md](docs/WINDOWS_QUICKSTART.md)** - Quick start for Windows
+- **[WINDOWS_COMPATIBILITY.md](docs/WINDOWS_COMPATIBILITY.md)** - Windows compatibility notes
+- **[WINDOWS_TEST_RESULTS.md](docs/WINDOWS_TEST_RESULTS.md)** - Windows test results
 
 ## Description
 
@@ -33,119 +80,60 @@ A comprehensive authentication and authorization service built with Go, providin
 - **Multi-tenancy**: Tenant isolation and tenant-specific role management
 - **Permission System**: Granular resource and action-based permissions
 
-## Prerequisites
+## 🚀 Quick Start
 
-- Go 1.25+
-- MongoDB 4.4+ (if applicable)
-- Redis 6.0+ (if applicable)
-- RabbitMQ 3.9+ (if applicable)
+### Prerequisites
 
-**Windows Users:** See [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for detailed Windows installation guide.
+Each microservice has its own prerequisites. See individual README files:
+- **Server**: Go 1.21+, PostgreSQL (see [server/README.md](server/README.md))
+- **Client**: Node.js 16+, npm/yarn (see [client/README.md](client/README.md))
+- **Flutter**: Flutter SDK 3.0+ (see [flutter/README.md](flutter/README.md))
 
-## Installation
+**Windows Users:** See [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md) for detailed Windows installation guide.
 
-### Linux / macOS
+### Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/vhvplatform/go-auth-service.git
 cd go-auth-service
 
-# Install dependencies
+# Install server dependencies
+cd server
 go mod download
+
+# Install client dependencies (when available)
+cd ../client
+npm install
+
+# Install flutter dependencies (when available)
+cd ../flutter
+flutter pub get
 ```
 
-### Windows
+### Development
 
-For Windows-specific installation instructions, see [WINDOWS_SETUP.md](WINDOWS_SETUP.md).
+Navigate to the specific service directory and follow its README:
 
-**Quick Start (Windows):**
-```cmd
-# Clone the repository
-git clone https://github.com/vhvplatform/go-auth-service.git
-cd go-auth-service
-
-# Run setup script
-setup-windows.bat
-
-# Or using PowerShell
-.\setup-windows.ps1
-```
-
-## Configuration
-
-Copy the example environment file and update with your values:
-
+**Server (Golang):**
 ```bash
-cp .env.example .env
+cd server
+make run-dev
+# See server/README.md for more details
 ```
 
-See [DEPENDENCIES.md](docs/DEPENDENCIES.md) for a complete list of environment variables.
-
-## Development
-
-### Running Locally
-
-**Linux / macOS:**
+**Client (ReactJS):**
 ```bash
-# Run the service
-make run
-
-# Or with go run
-go run cmd/main.go
+cd client
+npm start
+# See client/README.md for more details
 ```
 
-**Windows:**
-```cmd
-# Using batch script
-run-dev.bat
-
-# Or using PowerShell
-.\run-dev.ps1
-
-# Or with go run
-go run cmd/main.go
-```
-
-### Running with Docker
-
+**Flutter (Mobile):**
 ```bash
-# Build and run
-make docker-build
-make docker-run
-```
-
-### Running Tests
-
-**Linux / macOS:**
-```bash
-# Run all tests
-make test
-
-# Run with coverage
-make test-coverage
-```
-
-**Windows:**
-```cmd
-# Using batch script
-test-windows.bat
-
-# Or using PowerShell
-.\test-windows.ps1
-
-# Or with go test
-go test ./...
-```
-
-### Linting
-
-```bash
-# Run linters
-make lint
-
-# Format code
-make fmt
+cd flutter
+flutter run
+# See flutter/README.md for more details
 ```
 
 ## Authentication Flows
