@@ -1,14 +1,64 @@
-# go-auth-service
+# VHV Platform - Authentication Service
 
-> Authentication and Authorization Service - Part of the SaaS Framework
+> Full-stack Authentication and Authorization Platform - Part of the SaaS Framework
 
 **Windows Developers:** 🪟 See [WINDOWS_QUICKSTART.md](WINDOWS_QUICKSTART.md) for quick setup or [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for detailed guide.
 
+## 📁 Repository Structure
+
+This repository is organized into multiple microservices and applications:
+
+```
+├── server/          # Go backend microservice (authentication service)
+├── client/          # ReactJS frontend microservice (web UI)
+├── flutter/         # Flutter mobile application (iOS & Android)
+└── docs/            # Project documentation
+```
+
+### 🖥️ Server (Backend)
+Go-based authentication microservice providing:
+- gRPC API for service-to-service communication
+- REST API for client applications
+- JWT token management
+- OAuth2 integration
+- MongoDB & Redis integration
+
+**[→ See server/README.md for details](server/README.md)**
+
+### 🌐 Client (Frontend)
+ReactJS-based web application providing:
+- User authentication interface
+- Login and registration forms
+- OAuth2 integration UI
+- User profile management
+
+**[→ See client/README.md for details](client/README.md)**
+
+### 📱 Flutter (Mobile)
+Flutter mobile application for iOS & Android:
+- Native mobile authentication experience
+- Biometric authentication
+- Push notifications
+- Offline mode support
+
+**[→ See flutter/README.md for details](flutter/README.md)**
+
+### 📚 Documentation
+Project documentation and design documents:
+- Database design
+- API documentation
+- Security guidelines
+- Performance optimization
+
+**[→ See docs/ directory for all documentation](docs/)**
+
 ## Description
 
-A comprehensive authentication and authorization service built with Go, providing secure user authentication, JWT token management, OAuth2 integration, and multi-factor authentication support. This service is designed for multi-tenant SaaS applications with enterprise-grade security features.
+A comprehensive authentication and authorization platform built with modern technologies, providing secure user authentication, JWT token management, OAuth2 integration, and multi-factor authentication support. This platform is designed for multi-tenant SaaS applications with enterprise-grade security features.
 
 ## Features
+
+The authentication platform provides comprehensive features across all components:
 
 ### Core Authentication
 - **User Registration & Login**: Secure user registration with email verification and login with JWT tokens
@@ -33,120 +83,82 @@ A comprehensive authentication and authorization service built with Go, providin
 - **Multi-tenancy**: Tenant isolation and tenant-specific role management
 - **Permission System**: Granular resource and action-based permissions
 
-## Prerequisites
+## Quick Start
 
+### Prerequisites
+
+Different components have different prerequisites:
+
+**Server (Go Backend):**
 - Go 1.25+
 - MongoDB 4.4+ (if applicable)
 - Redis 6.0+ (if applicable)
-- RabbitMQ 3.9+ (if applicable)
+
+**Client (ReactJS Frontend):**
+- Node.js 16+ 
+- npm or yarn
+
+**Flutter (Mobile App):**
+- Flutter SDK 3.0+
+- Android Studio / Xcode
 
 **Windows Users:** See [WINDOWS_SETUP.md](WINDOWS_SETUP.md) for detailed Windows installation guide.
 
 ## Installation
 
-### Linux / macOS
+### Clone the Repository
 
 ```bash
-# Clone the repository
 git clone https://github.com/vhvplatform/go-auth-service.git
 cd go-auth-service
+```
 
-# Install dependencies
+### Server Setup
+
+```bash
+cd server
 go mod download
+cp .env.example .env
+# Edit .env with your configuration
 ```
 
-### Windows
+See [server/README.md](server/README.md) for detailed server setup and configuration.
 
-For Windows-specific installation instructions, see [WINDOWS_SETUP.md](WINDOWS_SETUP.md).
-
-**Quick Start (Windows):**
-```cmd
-# Clone the repository
-git clone https://github.com/vhvplatform/go-auth-service.git
-cd go-auth-service
-
-# Run setup script
-setup-windows.bat
-
-# Or using PowerShell
-.\setup-windows.ps1
-```
-
-## Configuration
-
-Copy the example environment file and update with your values:
+### Client Setup (Future)
 
 ```bash
-cp .env.example .env
+cd client
+npm install
+# Configure API endpoints
+npm start
 ```
 
-See [DEPENDENCIES.md](docs/DEPENDENCIES.md) for a complete list of environment variables.
+### Flutter Setup (Future)
+
+```bash
+cd flutter
+flutter pub get
+flutter run
+```
 
 ## Development
 
-### Running Locally
+### Running the Backend Server
 
-**Linux / macOS:**
 ```bash
-# Run the service
+cd server
 make run
-
-# Or with go run
-go run cmd/main.go
-```
-
-**Windows:**
-```cmd
-# Using batch script
-run-dev.bat
-
-# Or using PowerShell
-.\run-dev.ps1
-
-# Or with go run
-go run cmd/main.go
-```
-
-### Running with Docker
-
-```bash
-# Build and run
-make docker-build
-make docker-run
+# Or: go run ./cmd/main.go
 ```
 
 ### Running Tests
 
-**Linux / macOS:**
 ```bash
-# Run all tests
+cd server
 make test
-
-# Run with coverage
-make test-coverage
 ```
 
-**Windows:**
-```cmd
-# Using batch script
-test-windows.bat
-
-# Or using PowerShell
-.\test-windows.ps1
-
-# Or with go test
-go test ./...
-```
-
-### Linting
-
-```bash
-# Run linters
-make lint
-
-# Format code
-make fmt
-```
+For detailed development instructions for each component, see their respective README files.
 
 ## Authentication Flows
 

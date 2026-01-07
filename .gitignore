@@ -18,6 +18,7 @@ coverage.html
 
 # Dependencies
 vendor/
+node_modules/
 
 # IDE
 .idea/
@@ -51,3 +52,27 @@ logs/
 
 # Documentation build
 docs/_build/
+
+# Client (ReactJS)
+client/node_modules/
+client/build/
+client/dist/
+client/.env.local
+client/npm-debug.log*
+client/yarn-debug.log*
+client/yarn-error.log*
+
+# Flutter
+flutter/.dart_tool/
+flutter/.flutter-plugins
+flutter/.flutter-plugins-dependencies
+flutter/.packages
+flutter/build/
+flutter/pubspec.lock
+flutter/*.iml
+flutter/android/.gradle/
+flutter/android/local.properties
+flutter/ios/Pods/
+flutter/ios/.symlinks/
+flutter/ios/Flutter/Flutter.framework
+flutter/ios/Flutter/Flutter.podspec
