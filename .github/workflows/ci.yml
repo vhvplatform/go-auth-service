@@ -43,14 +43,16 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-${{ hashFiles('server/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
 
       - name: Download dependencies
+        working-directory: ./server
         run: go mod download
 
       - name: Run unit tests
+        working-directory: ./server
         run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
         env:
           MONGODB_URI: mongodb://localhost:27017
@@ -58,6 +60,7 @@ jobs:
           RABBITMQ_URL: amqp://guest:guest@localhost:5672/
 
       - name: Check coverage
+        working-directory: ./server
         run: |
           coverage=$(go tool cover -func=coverage.txt | grep total | awk '{print $3}' | sed 's/%//')
           echo "Coverage: $coverage%"
@@ -69,7 +72,7 @@ jobs:
       - name: Upload coverage
         uses: codecov/codecov-action@v5
         with:
-          file: ./coverage.txt
+          file: ./server/coverage.txt
 
   lint:
     name: Lint
@@ -88,6 +91,7 @@ jobs:
         with:
           version: latest
           args: --timeout=5m
+          working-directory: server
 
   security:
     name: Security
@@ -99,7 +103,7 @@ jobs:
       - name: Run gosec
         uses: securego/gosec@master
         with:
-          args: ./...
+          args: ./server/...
 
       - name: Run Snyk
         uses: snyk/actions/golang@master
@@ -107,6 +111,7 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           command: test
+          args: --file=server/go.mod
         continue-on-error: true
 
   build:
