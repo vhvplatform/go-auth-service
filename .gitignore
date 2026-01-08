@@ -4,7 +4,7 @@
 *.dll
 *.so
 *.dylib
-service
+# service (removed as it blocks internal/service)
 main
 
 # Test binary

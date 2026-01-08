@@ -2,17 +2,90 @@ syntax = "proto3";
 
 package auth;
 
+import "google/api/annotations.proto";
+
 option go_package = "github.com/vhvplatform/go-auth-service/proto";
 
 // AuthService provides authentication and authorization functionality
 service AuthService {
-  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
-  rpc GetUserRoles(GetUserRolesRequest) returns (GetUserRolesResponse);
-  rpc CheckPermission(CheckPermissionRequest) returns (CheckPermissionResponse);
+  rpc Login(LoginRequest) returns (LoginResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/login"
+      body: "*"
+    };
+  }
+
+  rpc Register(RegisterRequest) returns (RegisterResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/register"
+      body: "*"
+    };
+  }
+
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/refresh"
+      body: "*"
+    };
+  }
+
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/validate"
+      body: "*"
+    };
+  }
+
+  rpc VerifyToken(VerifyTokenRequest) returns (VerifyTokenResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/verify"
+      body: "*"
+    };
+  }
+
+  rpc GetUserRoles(GetUserRolesRequest) returns (GetUserRolesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/auth/roles/{user_id}"
+    };
+  }
+
+  rpc CheckPermission(CheckPermissionRequest) returns (CheckPermissionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/check-permission"
+      body: "*"
+    };
+  }
+
+  rpc GetTenantLoginConfig(GetTenantLoginConfigRequest) returns (GetTenantLoginConfigResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/auth/tenants/{tenant_id}/login-config"
+    };
+  }
+
+  rpc Logout(LogoutRequest) returns (LogoutResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/auth/logout"
+      body: "*"
+    };
+  }
+}
+
+message LoginRequest {
+  string identifier = 1; // Can be email, username, phone, etc.
+  string password = 2;
+  string tenant_id = 3;
+}
+
+message LoginResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  string token_type = 3;
+  int64 expires_in = 4;
 }
 
 message ValidateTokenRequest {
   string token = 1;
+  string tenant_id = 2; // Required if token is not tenant-specific
 }
 
 message ValidateTokenResponse {
@@ -21,7 +94,9 @@ message ValidateTokenResponse {
   string tenant_id = 3;
   string email = 4;
   repeated string roles = 5;
-  string error_message = 6;
+  repeated string permissions = 6;
+  string error_message = 7;
+  map<string, string> metadata = 8;
 }
 
 message GetUserRolesRequest {
@@ -42,4 +117,68 @@ message CheckPermissionRequest {
 
 message CheckPermissionResponse {
   bool allowed = 1;
+}
+
+message RegisterRequest {
+  string email = 1;
+  string username = 2;
+  string password = 3;
+  string phone = 4;
+  string document_number = 5;
+  string tenant_id = 6;
+  string first_name = 7;
+  string last_name = 8;
+}
+
+message RegisterResponse {
+  string user_id = 1;
+  string message = 2;
+}
+
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+message RefreshTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  string token_type = 3;
+  int64 expires_in = 4;
+}
+
+message VerifyTokenRequest {
+  string token = 1;
+}
+
+message VerifyTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string tenant_id = 3;
+  string email = 4;
+  repeated string roles = 5;
+  repeated string permissions = 6;
+  map<string, string> metadata = 7;
+}
+
+message GetTenantLoginConfigRequest {
+  string tenant_id = 1;
+}
+
+message GetTenantLoginConfigResponse {
+  repeated string allowed_identifiers = 1; // ["email", "phone", "username", "document_number"]
+  bool require_2fa = 2;
+  bool allow_registration = 3;
+  string custom_logo_url = 4;
+  string custom_background_url = 5;
+  map<string, string> custom_fields = 6;
+}
+
+message LogoutRequest {
+  string token = 1;
+  string tenant_id = 2;
+}
+
+message LogoutResponse {
+  bool success = 1;
+  string message = 2;
 }

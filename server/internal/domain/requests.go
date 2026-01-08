@@ -16,23 +16,6 @@ type LoginRequest struct {
 	TenantID string `json:"tenant_id"`
 }
 
-// LoginResponse represents a login response
-type LoginResponse struct {
-	AccessToken  string   `json:"access_token"`
-	RefreshToken string   `json:"refresh_token"`
-	ExpiresIn    int      `json:"expires_in"`
-	TokenType    string   `json:"token_type"`
-	User         UserInfo `json:"user"`
-}
-
-// UserInfo represents user information returned in response
-type UserInfo struct {
-	ID       string   `json:"id"`
-	Email    string   `json:"email"`
-	TenantID string   `json:"tenant_id"`
-	Roles    []string `json:"roles"`
-}
-
 // RefreshTokenRequest represents a refresh token request
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`

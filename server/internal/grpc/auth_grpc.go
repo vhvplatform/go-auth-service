@@ -1,14 +1,17 @@
 package grpc
 
 import (
+	"context"
+
 	"github.com/vhvplatform/go-auth-service/internal/service"
+	pb "github.com/vhvplatform/go-auth-service/proto"
 	"github.com/vhvplatform/go-shared/logger"
-	// pb "github.com/vhvplatform/go-auth-service/proto"
+	"go.uber.org/zap"
 )
 
 // AuthServiceServer implements the gRPC auth service
 type AuthServiceServer struct {
-	// pb.UnimplementedAuthServiceServer
+	pb.UnimplementedAuthServiceServer
 	authService *service.AuthService
 	logger      *logger.Logger
 }
@@ -21,13 +24,9 @@ func NewAuthServiceServer(authService *service.AuthService, log *logger.Logger) 
 	}
 }
 
-// Note: gRPC methods are commented out until protobuf code is generated
-// Run `make proto` to generate the protobuf code, then uncomment the methods below
-
-/*
-// ValidateToken validates a JWT token
+// ValidateToken validates a JWT or Opaque token
 func (s *AuthServiceServer) ValidateToken(ctx context.Context, req *pb.ValidateTokenRequest) (*pb.ValidateTokenResponse, error) {
-	claims, err := s.authService.ValidateToken(ctx, req.Token)
+	resp, err := s.authService.ValidateToken(ctx, req.Token, req.TenantId)
 	if err != nil {
 		s.logger.Warn("Token validation failed", zap.Error(err))
 		return &pb.ValidateTokenResponse{
@@ -37,11 +36,13 @@ func (s *AuthServiceServer) ValidateToken(ctx context.Context, req *pb.ValidateT
 	}
 
 	return &pb.ValidateTokenResponse{
-		Valid:    true,
-		UserId:   claims.UserID,
-		TenantId: claims.TenantID,
-		Email:    claims.Email,
-		Roles:    claims.Roles,
+		Valid:       true,
+		UserId:      resp.UserID,
+		TenantId:    resp.TenantID,
+		Email:       resp.Email,
+		Roles:       resp.Roles,
+		Permissions: resp.Permissions,
+		Metadata:    resp.Metadata,
 	}, nil
 }
 
@@ -71,4 +72,3 @@ func (s *AuthServiceServer) CheckPermission(ctx context.Context, req *pb.CheckPe
 		Allowed: allowed,
 	}, nil
 }
-*/

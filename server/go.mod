@@ -4,6 +4,7 @@ go 1.25.5
 
 require (
 	github.com/gin-gonic/gin v1.11.0
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/stretchr/testify v1.11.1
 	github.com/vhvplatform/go-shared v1.0.0
 	go.mongodb.org/mongo-driver v1.17.6
@@ -73,3 +74,5 @@ require (
 // while it still declares itself as github.com/vhvplatform/go-shared
 
 exclude github.com/pelletier/go-toml/v3 v3.0.0
+
+replace github.com/vhvplatform/go-shared => ../../go-shared

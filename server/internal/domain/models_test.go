@@ -13,7 +13,7 @@ func TestUser_Structure(t *testing.T) {
 		ID:           primitive.NewObjectID(),
 		Email:        "test@example.com",
 		PasswordHash: "$2a$12$hashedpassword",
-		TenantID:     "tenant_001",
+		Tenants:      []string{"tenant_001"},
 		Roles:        []string{"user", "admin"},
 		IsActive:     true,
 		IsVerified:   false,
@@ -23,7 +23,7 @@ func TestUser_Structure(t *testing.T) {
 
 	assert.NotEmpty(t, user.ID)
 	assert.Equal(t, "test@example.com", user.Email)
-	assert.Equal(t, "tenant_001", user.TenantID)
+	assert.Contains(t, user.Tenants, "tenant_001")
 	assert.Contains(t, user.Roles, "user")
 	assert.Contains(t, user.Roles, "admin")
 	assert.True(t, user.IsActive)

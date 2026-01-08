@@ -6,12 +6,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/vhvplatform/go-auth-service/internal/domain"
 	"github.com/vhvplatform/go-auth-service/internal/service"
-	"github.com/vhvplatform/go-shared/errors"
 	"github.com/vhvplatform/go-shared/logger"
 	"go.uber.org/zap"
 )
 
-// AuthHandler handles HTTP requests for authentication
+// AuthHandler handles authentication HTTP requests
 type AuthHandler struct {
 	authService *service.AuthService
 	logger      *logger.Logger
@@ -27,45 +26,47 @@ func NewAuthHandler(authService *service.AuthService, log *logger.Logger) *AuthH
 
 // Register handles user registration
 func (h *AuthHandler) Register(c *gin.Context) {
-	var req domain.RegisterRequest
+	var req domain.User
 	if err := c.ShouldBindJSON(&req); err != nil {
-		h.respondError(c, errors.BadRequest("Invalid request body"))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	resp, err := h.authService.Register(c.Request.Context(), &req)
+	user, err := h.authService.Register(c.Request.Context(), &req)
 	if err != nil {
-		h.respondError(c, err)
+		h.logger.Error("Registration failed", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"data": resp})
+	c.JSON(http.StatusCreated, user)
 }
 
 // Login handles user login
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req domain.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		h.respondError(c, errors.BadRequest("Invalid request body"))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	resp, err := h.authService.Login(c.Request.Context(), &req)
+	resp, err := h.authService.Login(c.Request.Context(), req.Email, req.Password, req.TenantID)
 	if err != nil {
-		h.respondError(c, err)
+		h.logger.Warn("Login failed", zap.Error(err))
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": resp})
+	c.JSON(http.StatusOK, resp)
 }
 
 // Logout handles user logout
 func (h *AuthHandler) Logout(c *gin.Context) {
 	userID := c.GetString("user_id")
-	refreshToken := c.GetHeader("X-Refresh-Token")
+	token := c.GetString("refresh_token")
 
-	if err := h.authService.Logout(c.Request.Context(), userID, refreshToken); err != nil {
-		h.respondError(c, err)
+	if err := h.authService.Logout(c.Request.Context(), userID, token); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Logout failed"})
 		return
 	}
 
@@ -76,26 +77,15 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req domain.RefreshTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		h.respondError(c, errors.BadRequest("Invalid request body"))
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	resp, err := h.authService.RefreshToken(c.Request.Context(), req.RefreshToken)
 	if err != nil {
-		h.respondError(c, err)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": resp})
-}
-
-// respondError responds with an error
-func (h *AuthHandler) respondError(c *gin.Context, err error) {
-	appErr := errors.FromError(err)
-	h.logger.Error("Request failed",
-		zap.String("path", c.Request.URL.Path),
-		zap.String("method", c.Request.Method),
-		zap.String("error", appErr.Message),
-	)
-	c.JSON(appErr.StatusCode, gin.H{"error": appErr})
+	c.JSON(http.StatusOK, resp)
 }

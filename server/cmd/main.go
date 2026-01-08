@@ -15,11 +15,13 @@ import (
 	"github.com/vhvplatform/go-auth-service/internal/handler"
 	"github.com/vhvplatform/go-auth-service/internal/repository"
 	"github.com/vhvplatform/go-auth-service/internal/service"
+	"github.com/vhvplatform/go-auth-service/internal/utils"
 	"github.com/vhvplatform/go-shared/config"
 	"github.com/vhvplatform/go-shared/jwt"
 	"github.com/vhvplatform/go-shared/logger"
 	"github.com/vhvplatform/go-shared/mongodb"
 	"github.com/vhvplatform/go-shared/redis"
+
 	// pb "github.com/vhvplatform/go-auth-service/proto"
 	"go.uber.org/zap"
 	grpcServer "google.golang.org/grpc"
@@ -55,34 +57,40 @@ func main() {
 	}
 	defer mongoClient.Close(context.Background())
 
-	// Initialize Redis
-	redisClient, err := redis.NewClient(redis.Config{
-		Addr:     cfg.Redis.GetRedisAddr(),
-		Password: cfg.Redis.Password,
-		DB:       cfg.Redis.DB,
-	})
-	if err != nil {
-		log.Fatal("Failed to connect to Redis", zap.Error(err))
+	// Initialize Redis (optional)
+	var redisClient *redis.Client
+	if cfg.Redis.Enabled {
+		redisClient, err = redis.NewClient(redis.Config{
+			Addr:     cfg.Redis.GetRedisAddr(),
+			Password: cfg.Redis.Password,
+			DB:       cfg.Redis.DB,
+		})
+		if err != nil {
+			log.Fatal("Failed to connect to Redis", zap.Error(err))
+		}
+		defer redisClient.Close()
+	} else {
+		log.Info("Redis is disabled, skipping connection")
 	}
-	defer redisClient.Close()
 
 	// Initialize JWT manager
 	jwtManager := jwt.NewManager(cfg.JWT.Secret, cfg.JWT.Expiration, cfg.JWT.RefreshExpiration)
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(mongoClient.Database())
+	tenantRepo := repository.NewTenantRepository(mongoClient.Database())
 	refreshTokenRepo := repository.NewRefreshTokenRepository(mongoClient.Database())
 	roleRepo := repository.NewRoleRepository(mongoClient.Database())
 
 	// Initialize services
-	authService := service.NewAuthService(userRepo, refreshTokenRepo, roleRepo, jwtManager, redisClient, log)
+	authService := service.NewAuthService(userRepo, tenantRepo, refreshTokenRepo, roleRepo, jwtManager, redisClient, log)
 
 	// Start gRPC server
 	grpcPort := os.Getenv("AUTH_SERVICE_PORT")
 	if grpcPort == "" {
 		grpcPort = "50051"
 	}
-	go startGRPCServer(authService, log, grpcPort)
+	go startGRPCServer(authService, log, grpcPort, cfg) // Pass cfg for TLS paths
 
 	// Start HTTP server
 	httpPort := os.Getenv("AUTH_SERVICE_HTTP_PORT")
@@ -92,13 +100,24 @@ func main() {
 	startHTTPServer(authService, log, httpPort)
 }
 
-func startGRPCServer(authService *service.AuthService, log *logger.Logger, port string) {
+func startGRPCServer(authService *service.AuthService, log *logger.Logger, port string, cfg *config.Config) {
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		log.Fatal("Failed to listen", zap.Error(err))
 	}
 
-	grpcSrv := grpcServer.NewServer()
+	var opts []grpcServer.ServerOption
+
+	// Enable mTLS if configured
+	if cfg.TLS.Enabled {
+		creds, err := utils.LoadTLSCredentials(cfg.TLS.CertFile, cfg.TLS.KeyFile, cfg.TLS.CAFile)
+		if err != nil {
+			log.Fatal("Failed to load TLS credentials", zap.Error(err))
+		}
+		opts = append(opts, grpcServer.Creds(creds))
+	}
+
+	grpcSrv := grpcServer.NewServer(opts...)
 	authGrpcServer := grpc.NewAuthServiceServer(authService, log)
 	// pb.RegisterAuthServiceServer(grpcSrv, authGrpcServer)
 	_ = authGrpcServer // Use the variable to avoid unused error

@@ -28,17 +28,22 @@ func NewUserRepository(db *mongo.Database) *UserRepository {
 	indexes := []mongo.IndexModel{
 		{
 			Keys:    bson.D{{Key: "email", Value: 1}},
-			Options: options.Index().SetUnique(true),
+			Options: options.Index().SetUnique(true).SetSparse(true),
 		},
 		{
-			Keys: bson.D{{Key: "tenantId", Value: 1}},
+			Keys:    bson.D{{Key: "username", Value: 1}},
+			Options: options.Index().SetUnique(true).SetSparse(true),
 		},
 		{
-			Keys: bson.D{
-				{Key: "email", Value: 1},
-				{Key: "tenantId", Value: 1},
-			},
-			Options: options.Index().SetUnique(true),
+			Keys:    bson.D{{Key: "phone", Value: 1}},
+			Options: options.Index().SetUnique(true).SetSparse(true),
+		},
+		{
+			Keys:    bson.D{{Key: "docNumber", Value: 1}},
+			Options: options.Index().SetUnique(true).SetSparse(true),
+		},
+		{
+			Keys: bson.D{{Key: "tenants", Value: 1}},
 		},
 	}
 
@@ -61,57 +66,24 @@ func (r *UserRepository) Create(ctx context.Context, user *domain.User) error {
 	return nil
 }
 
-// FindByEmail finds a user by email
-func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
+// FindByIdentifier finds a user by any of their identifiers (email, username, phone, doc number)
+func (r *UserRepository) FindByIdentifier(ctx context.Context, identifier string) (*domain.User, error) {
 	var user domain.User
-	// Use projection to optimize query performance
-	opts := options.FindOne().SetProjection(bson.M{
-		"_id":          1,
-		"email":        1,
-		"passwordHash": 1,
-		"tenantId":     1,
-		"roles":        1,
-		"isActive":     1,
-		"isVerified":   1,
-		"lastLoginAt":  1,
-		"createdAt":    1,
-		"updatedAt":    1,
-	})
-	err := r.collection.FindOne(ctx, bson.M{"email": email}, opts).Decode(&user)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to find user by email: %w", err)
+	filter := bson.M{
+		"$or": []bson.M{
+			{"email": identifier},
+			{"username": identifier},
+			{"phone": identifier},
+			{"docNumber": identifier},
+		},
 	}
-	return &user, nil
-}
 
-// FindByEmailAndTenant finds a user by email and tenant
-func (r *UserRepository) FindByEmailAndTenant(ctx context.Context, email, tenantID string) (*domain.User, error) {
-	var user domain.User
-	// Use projection to fetch only needed fields for faster query
-	opts := options.FindOne().SetProjection(bson.M{
-		"_id":          1,
-		"email":        1,
-		"passwordHash": 1,
-		"tenantId":     1,
-		"roles":        1,
-		"isActive":     1,
-		"isVerified":   1,
-		"lastLoginAt":  1,
-		"createdAt":    1,
-		"updatedAt":    1,
-	})
-	err := r.collection.FindOne(ctx, bson.M{
-		"email":    email,
-		"tenantId": tenantID,
-	}, opts).Decode(&user)
+	err := r.collection.FindOne(ctx, filter).Decode(&user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("failed to find user: %w", err)
+		return nil, fmt.Errorf("failed to find user by identifier: %w", err)
 	}
 	return &user, nil
 }
@@ -124,20 +96,7 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*domain.User,
 	}
 
 	var user domain.User
-	// Use projection for optimized query
-	opts := options.FindOne().SetProjection(bson.M{
-		"_id":          1,
-		"email":        1,
-		"passwordHash": 1,
-		"tenantId":     1,
-		"roles":        1,
-		"isActive":     1,
-		"isVerified":   1,
-		"lastLoginAt":  1,
-		"createdAt":    1,
-		"updatedAt":    1,
-	})
-	err = r.collection.FindOne(ctx, bson.M{"_id": objectID}, opts).Decode(&user)
+	err = r.collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&user)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
@@ -181,30 +140,32 @@ func (r *UserRepository) UpdateLastLogin(ctx context.Context, userID string) err
 	return nil
 }
 
-// CountByTenant returns the number of users in a tenant
-func (r *UserRepository) CountByTenant(ctx context.Context, tenantID string) (int64, error) {
-	count, err := r.collection.CountDocuments(ctx, bson.M{"tenantId": tenantID})
+// AddTenant adds a tenant to a user
+func (r *UserRepository) AddTenant(ctx context.Context, userID, tenantID string) error {
+	objectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		return 0, fmt.Errorf("failed to count users: %w", err)
+		return fmt.Errorf("invalid user ID: %w", err)
 	}
-	return count, nil
+
+	_, err = r.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": objectID},
+		bson.M{"$addToSet": bson.M{"tenants": tenantID}},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to add tenant to user: %w", err)
+	}
+	return nil
 }
 
-// FindActiveByTenant finds active users in a tenant
-func (r *UserRepository) FindActiveByTenant(ctx context.Context, tenantID string, limit, skip int64) ([]*domain.User, error) {
-	filter := bson.M{
-		"tenantId": tenantID,
-		"isActive": true,
-	}
+// FindByTenant finds users in a tenant
+func (r *UserRepository) FindByTenant(ctx context.Context, tenantID string, limit, skip int64) ([]*domain.User, error) {
+	filter := bson.M{"tenants": tenantID}
 
-	opts := options.Find().
-		SetLimit(limit).
-		SetSkip(skip).
-		SetSort(bson.D{{Key: "createdAt", Value: -1}})
-
+	opts := options.Find().SetLimit(limit).SetSkip(skip)
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find active users: %w", err)
+		return nil, fmt.Errorf("failed to find users by tenant: %w", err)
 	}
 	defer cursor.Close(ctx)
 
@@ -212,6 +173,5 @@ func (r *UserRepository) FindActiveByTenant(ctx context.Context, tenantID string
 	if err := cursor.All(ctx, &users); err != nil {
 		return nil, fmt.Errorf("failed to decode users: %w", err)
 	}
-
 	return users, nil
 }
